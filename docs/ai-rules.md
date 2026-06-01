@@ -7,6 +7,7 @@ Before coding, read:
 - `docs/product-context.md`.
 - `docs/technical-foundation.md`.
 - `docs/design-system.md`.
+- `docs/connected-ui-testing.md` when testing authenticated UI flows.
 
 The product is an Obsidian-like company second brain. The MVP must prove fast capture, daily note, boxes, search, and contextual AI. Do not optimize for a generic SaaS dashboard.
 
@@ -77,7 +78,16 @@ The product is an Obsidian-like company second brain. The MVP must prove fast ca
 - All DB access goes through `src/server/db`.
 - Do not trust `workspaceId` from the client.
 - Derive the active workspace from Clerk server auth.
-- If no organization exists after signup, onboarding must create a default organization/workspace.
+- If no organization exists after signup, onboarding must ask the user to create a workspace.
+- Joining an existing workspace happens only through an invitation.
+- Never expose a public searchable or browsable list of organizations.
+- Users may belong to multiple Clerk organizations.
+- Server code must sync the active Clerk organization to the local `workspaces` mirror before workspace-scoped data access.
+- Do not build custom organization management forms while Clerk prebuilt components cover the need.
+- Organization profile, members, invitations, roles, rename, and delete should be managed through Clerk UI for the MVP.
+- The Settings page can embed Clerk `OrganizationProfile`, but it must not duplicate Clerk organization management logic.
+- Use Clerk's built-in organization roles and permissions for MVP organization management.
+- Add or update Clerk webhooks before depending on organization changes that may happen outside the active user flow.
 - Server mutations must validate input with schemas.
 - Route Handlers are used for AI, uploads, webhooks, and integrations.
 - Server Actions are only for small internal mutations when they are simpler than a route.
@@ -115,6 +125,10 @@ The product is an Obsidian-like company second brain. The MVP must prove fast ca
 - The baseline stack is Vitest for logic and Playwright for critical flows.
 - Do not add or implement tests unless explicitly requested.
 - When tests are requested, keep them focused on critical MVP behavior rather than broad snapshot coverage.
+- For manual/browser UI verification that requires a signed-in user, follow `docs/connected-ui-testing.md`.
+- Use Clerk deterministic test users only in local development or approved staging environments.
+- Do not ask the developer for an OTP when using Clerk test identifiers; use the documented test OTP.
+- Do not use real user credentials for AI-driven testing.
 
 ## Dependency rules
 

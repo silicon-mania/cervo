@@ -107,6 +107,7 @@ Must have:
 
 - Email OTP authentication.
 - Organization/workspace onboarding before app access.
+- Invite-only workspace joining: users can create a workspace or accept an invitation, but cannot browse public organizations.
 - Daily note by default.
 - TipTap editor with autosave.
 - Basic keyboard shortcuts such as Cmd+B and Cmd+I.

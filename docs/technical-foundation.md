@@ -52,7 +52,13 @@ Vercel deployment
 - Typography: Geist Sans for interface text and Geist Mono for metadata/code-like UI.
 - Authentication method: email address with OTP code sent by email.
 - Workspace requirement: users must have an organization/workspace before accessing the app.
-- Onboarding: after signup, the user either joins an organization or gets one automatically created if they do not join an existing one.
+- Onboarding: after signup, the user either accepts an invitation to an existing workspace or creates a new workspace.
+- Workspace discovery: workspaces are invite-only; users must never browse a public list of organizations.
+- Multi-workspace support: users may belong to multiple Clerk organizations and switch between them.
+- Organization management UI: use Clerk prebuilt components as the single management surface for organizations, members, invitations, roles, rename, and delete.
+- Cervo must not implement custom organization management UI while Clerk covers the need.
+- Sidebar rule: keep the left sidebar minimal; do not place duplicate organization management controls there.
+- MVP invitation and role rules: rely on Clerk's built-in organization roles and permissions.
 - Database access: Drizzle + server-only Postgres connection.
 - Supabase RLS strategy for MVP: no browser-side DB access; authorization lives in the Next.js server layer using Clerk `orgId`.
 - Initial theme: light-first, subtle off-white/gray background, discreet panels.
@@ -136,7 +142,13 @@ Rule:
 - Server code must call a helper such as `requireWorkspace()`.
 - The client never decides which workspace a mutation belongs to.
 - Users cannot access the app until an organization/workspace exists.
-- If a user signs up without joining an organization, create a default organization/workspace during onboarding.
+- If a user signs up without joining an organization, onboarding must ask them to create a workspace.
+- Joining an existing workspace happens only through a Clerk organization invitation.
+- Do not expose a searchable or browsable list of organizations.
+- Users may belong to multiple organizations; the active Clerk organization defines the current app workspace.
+- Organization management actions must go through Clerk prebuilt UI or Clerk webhooks/server sync paths, not custom Cervo forms.
+- The Settings page may host other settings later, but organization management inside it should be rendered with Clerk `OrganizationProfile`.
+- Cervo keeps only a local mirror for app joins and workspace-scoped data.
 
 ### Supabase Postgres
 
@@ -513,6 +525,10 @@ ai_actions
 
 `workspaces` and `workspace_members` are local application mirrors of Clerk organizations and memberships. Clerk remains the auth and organization source of truth; local tables exist so app data can use stable internal ids and joins.
 
+Workspaces are invite-only in the MVP. A signed-in user can create a new workspace or accept an invitation sent by another member, but the app must not expose a public organization directory. A user can belong to multiple workspaces, and the active Clerk organization is the only workspace context used by server mutations.
+
+Clerk remains the source of truth for organization profile data, memberships, invitations, roles, and organization lifecycle operations. Cervo should not duplicate these management flows in custom forms. The local mirror exists only to connect Cervo product data to a stable internal `workspaceId`.
+
 ### `workspaces`
 
 ```txt
@@ -613,6 +629,10 @@ created_at
 - All workspace-scoped queries require `workspaceId`.
 - `workspaceId` comes from Clerk server auth, not from client input.
 - `workspaceId` should resolve from the active Clerk `orgId` through the local `workspaces` mirror.
+- The local workspace mirror should be created or updated whenever a user enters the app with an active Clerk organization.
+- Workspace invitations and membership management are handled by Clerk prebuilt components for the MVP.
+- Invitation acceptance and organization switching must lead through a sync step that ensures the local `workspaces` and `workspace_members` records exist.
+- Clerk webhooks should be added before relying on out-of-session organization changes, such as renames, deletions, membership changes, or role updates, to keep the local mirror synchronized.
 - Mutations validate input with Zod or equivalent schemas.
 - Route Handlers are used for AI, uploads, webhooks, and external integrations.
 
@@ -620,7 +640,7 @@ created_at
 
 1. Project scaffold and design tokens.
 2. Clerk email OTP auth.
-3. Organization/workspace onboarding.
+3. Organization/workspace onboarding with invite-only joining and local workspace sync.
 4. Organization-aware app shell.
 5. Supabase Postgres + Drizzle schema.
 6. Documents table and daily note auto-creation.

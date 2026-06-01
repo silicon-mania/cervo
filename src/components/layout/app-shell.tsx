@@ -70,7 +70,7 @@ export function AppShell({
             Archive
           </Button>
         </nav>
-        <div className="border-t p-3">
+        <div className="space-y-3 border-t p-3">
           <Button
             asChild
             variant="ghost"
