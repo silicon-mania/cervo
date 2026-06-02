@@ -56,18 +56,26 @@ The default app shape:
 
 ```txt
 ┌─────────────────────────────────────────────────────────┐
-│ Topbar: search, workspace, command access               │
+│ Topbar: centered global search, workspace, commands     │
 ├──────────────┬─────────────────────────────┬────────────┤
-│ Left sidebar │ Central editor              │ Right rail │
-│ Boxes/tasks  │ Daily note or box home      │ Calendar   │
-│ Archive      │                             │ Inbox/AI   │
+│ Icon rail    │ Main content                │ Right rail │
+│ Main/tasks   │ Daily note, then boxes      │ Inbox      │
+│ Settings     │ Box pages or task pages     │ Calendar   │
 └──────────────┴─────────────────────────────┴────────────┘
 ```
 
 Rules:
 
+- A centered global search bar must stay available in the top bar across app pages, including the main page, tasks, settings, and box pages.
+- The main page route is `/`. The left rail main/home icon opens `/`, not `/today`.
+- The left rail is icon-first and minimal. The main/home icon opens the default main page with today's note and boxes. The tasks icon opens a dedicated tasks page. Settings opens settings. Icon-only navigation items need hover tooltips.
 - The central editor keeps priority in width and visual hierarchy.
-- The right rail can switch between calendar, inbox, people, and assistant.
+- On the main page, the central scroll surface shows today's daily note first and boxes directly below it. The daily note should take roughly three quarters of the main content height in the default state, with the first boxes visible below the fold or near the bottom of the first viewport.
+- The main page box list shows all top-level boxes only. Child boxes are shown after opening their parent box, not in the main page top-level list.
+- The `Unsorted` box appears first and should be visually differentiated from normal project boxes in a subtle way.
+- The daily note has an expansion control that grows the note section to fit its content for writing-focused sessions. Expanding the note should not hide the right rail.
+- Box lists should feel like a lightweight file/folder surface, not a dashboard. On box pages, child boxes, notes/documents, and breadcrumbs should support a familiar Google Drive-like navigation model.
+- The right rail is simple for the current MVP interface: inbox on top, calendar/upcoming events on bottom. Do not build heavy panel behavior for it yet.
 - Bottom drawers may be used for mail, command output, or contextual tools.
 - Do not create multiple competing navigation systems.
 - Do not create nested cards for page sections.
@@ -108,6 +116,8 @@ Do not use cards for:
 
 - Use `lucide-react`.
 - Use icons for common actions: search, calendar, inbox, archive, plus, settings, command, bold, italic, link, checkbox.
+- Use a brain-like icon for the main page only if `lucide-react` provides a suitable one; otherwise use the closest clear navigation metaphor rather than custom-drawing an icon.
+- For boxes, prefer existing `lucide-react` box/archive/package icons. A simple closed/open icon state is enough for the MVP; do not build heavy custom animation.
 - Add tooltips for icon-only controls that are not obvious.
 - Do not hand-roll SVG icons unless the icon is product-specific.
 
@@ -125,10 +135,10 @@ The editor should feel like a fast note surface:
 Selection menu actions can include:
 
 - Turn into task.
-- Move to box.
-- Copy to box.
 - Ask assistant.
 - Summarize selection.
+
+Creating a new note from selected text and attaching it to boxes is a later workflow. Do not present move/copy selected text to box as a Phase 4 or Phase 5 action.
 
 ## States
 
@@ -158,9 +168,10 @@ Toast notifications:
 
 ## Content style
 
+- Product UI copy must stay in English.
 - Keep labels short.
 - Avoid explanatory marketing text inside the app.
-- Prefer concrete nouns: Today, Boxes, Tasks, Inbox, Calendar, People, Archive.
+- Prefer concrete nouns: Today, Unsorted, Boxes, Tasks, Inbox, Calendar, People, Archive.
 - Empty states can be helpful, but should not become tutorials.
 
 ## Accessibility

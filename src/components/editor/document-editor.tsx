@@ -17,6 +17,7 @@ type DocumentEditorProps = {
   editable?: boolean;
   autofocus?: boolean;
   className?: string;
+  editorClassName?: string;
   onChange?: (value: DocumentEditorValue) => void;
 };
 
@@ -31,6 +32,7 @@ export function DocumentEditor({
   editable = true,
   autofocus = false,
   className,
+  editorClassName,
   onChange,
 }: DocumentEditorProps) {
   const editor = useEditor({
@@ -44,6 +46,7 @@ export function DocumentEditor({
         class: cn(
           "min-h-[560px] w-full px-1 py-1 text-[15px] leading-7 outline-none",
           "text-foreground caret-foreground",
+          editorClassName,
         ),
         "aria-label": "Document editor",
       },

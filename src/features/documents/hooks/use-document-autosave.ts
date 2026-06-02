@@ -105,10 +105,7 @@ export function useDocumentAutosave({
       if (typeof navigator !== "undefined" && "sendBeacon" in navigator) {
         const blob = new Blob([payload], { type: "application/json" });
 
-        navigator.sendBeacon(
-          `/api/documents/${documentId}/autosave`,
-          blob,
-        );
+        navigator.sendBeacon(`/api/documents/${documentId}/autosave`, blob);
 
         attemptedRevisionRef.current = latestDraftRevision;
 
@@ -171,7 +168,7 @@ export function useDocumentAutosave({
     savedRevision,
   ]);
 
-  const autosaveState = useMemo(
+  return useMemo(
     () => ({
       handleChange,
       status,
@@ -179,6 +176,4 @@ export function useDocumentAutosave({
     }),
     [errorMessage, handleChange, status],
   );
-
-  return autosaveState;
 }

@@ -24,6 +24,9 @@ Already implemented:
 - Clerk `OrganizationProfile` embedded in Settings as the single organization management surface.
 - Local `workspaces` and `workspace_members` mirror through server-side Clerk sync.
 - Supabase Postgres + Drizzle schema and migrations.
+- DB-backed daily notes.
+- Shared TipTap `DocumentEditor`.
+- Daily note autosave with saved/saving/error states.
 - Direct OpenAI provider configuration through centralized server helpers.
 - Connected UI testing documentation for Clerk test users.
 
@@ -45,15 +48,15 @@ Build:
 - Use `requireWorkspace()` to resolve the active local workspace.
 - Query `documents` by `workspaceId`, `type = daily_note`, and today's date.
 - Create the daily note automatically when missing.
-- Render real daily note metadata in `/today`.
+- Render real daily note metadata in the daily-note surface.
 - Keep the placeholder editor area until `DocumentEditor` lands.
 
 Acceptance criteria:
 
-- A signed-in user with an active organization reaches `/today`.
+- A signed-in user with an active organization reaches the daily-note surface.
 - The local workspace mirror exists.
 - A daily note row exists for the active workspace and current date.
-- Reloading `/today` returns the same document, not a duplicate.
+- Reloading the daily-note surface returns the same document, not a duplicate.
 
 ## Phase 2: Shared TipTap `DocumentEditor`
 
@@ -72,7 +75,7 @@ Build:
 
 Acceptance criteria:
 
-- `/today` renders the daily note through `DocumentEditor`.
+- The daily-note surface renders the daily note through `DocumentEditor`.
 - The editor can produce JSON content and plain text content.
 - No feature creates a second TipTap setup.
 
@@ -99,7 +102,7 @@ Build:
 
 Acceptance criteria:
 
-- Typing in `/today` saves automatically.
+- Typing in the daily-note surface saves automatically.
 - Refreshing the page preserves the note content.
 - Normal saved state does not show `updated_at`, "last saved", workspace, timezone, or document id text.
 - Failed saves are visible without disrupting writing.
@@ -114,16 +117,27 @@ Build:
 
 - Add box creation.
 - Create a `box_home` document automatically for each box.
-- List active boxes in the app shell or a dedicated boxes view without cluttering the sidebar.
+- Add a `document_boxes` relationship table so documents can belong to several boxes without duplication.
+- Add nested box support with `parent_box_id` for future Google Drive-like box navigation.
+- Treat the default box as `Unsorted`, a visible catch-all/untriaged view, not as a normal user-editable project box unless explicitly decided later.
+- Make `/` the main product page and left rail main/home destination. `/today` may remain as a compatibility route or redirect, but it is no longer the primary navigation target.
+- Update the main page so today's note and all top-level boxes are visible on the same page: daily note first, boxes directly below.
+- Show `Unsorted` first and visually distinguish it subtly from normal project boxes.
+- Do not show child boxes in the main page top-level box list; child boxes appear when their parent box is opened.
+- Keep the left icon rail minimal: main page, tasks page, settings, with tooltips on hover.
 - Add `/boxes/[boxId]`.
 - Render the box home document with the shared `DocumentEditor`.
 - Support box statuses: `active`, `future`, `archived`.
+- Keep the right rail simple: inbox on top, calendar/upcoming events on bottom.
 
 Acceptance criteria:
 
 - A user can create a box.
 - Opening a box shows its home document.
 - Box documents use the same editor and autosave path as daily notes.
+- A document can be linked to more than one box without being duplicated.
+- A box can show child boxes and linked notes/documents.
+- The main page at `/` shows today's note, `Unsorted`, and all top-level boxes in one continuous central surface.
 
 ## Phase 5: Slash commands and selection actions
 
@@ -136,7 +150,7 @@ Build:
 - Add slash commands for tasks and checkboxes.
 - Add a compact selection menu.
 - Support turning selected text into a task.
-- Support sending or copying selected text to a box.
+- Defer creating a new note from selected text and attaching that note to boxes until the note/box relationship UX is intentionally designed.
 - Keep AI selection actions as a later addition if the data model is not ready.
 
 Acceptance criteria:
@@ -180,7 +194,7 @@ Build:
 
 Acceptance criteria:
 
-- `/today` shows DB-backed mock calendar and inbox context.
+- The main app surface shows DB-backed mock calendar and inbox context.
 - People/CRM data is available where the demo needs it.
 - Mock data is workspace-scoped.
 
@@ -248,13 +262,13 @@ Acceptance criteria:
 
 The next sprint should focus on:
 
-1. `getOrCreateTodayDocument()`.
-2. `/today` backed by the real daily note row.
-3. First shared `DocumentEditor`.
-4. Autosave for the daily note.
-5. Connected UI verification using `docs/connected-ui-testing.md`.
+1. Finalize the Phase 4 main-page interface direction before coding.
+2. Add box data support: `boxes`, `document_boxes`, `parent_box_id`, and automatic `box_home` documents.
+3. Update the app shell: centered global search, minimal left icon rail pointing main/home to `/`, main page with daily note plus top-level boxes, and simple right rail.
+4. Add `/boxes/[boxId]` with box home documents using the shared `DocumentEditor`.
+5. Verify the connected UI flow using `docs/connected-ui-testing.md` once implementation starts.
 
-This is the shortest path from scaffold to product core.
+This is the shortest path from the implemented daily-note/autosave foundation to the project-box mental model.
 
 ## Deferred until explicitly needed
 

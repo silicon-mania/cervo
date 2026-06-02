@@ -15,6 +15,8 @@ The product is an Obsidian-like company second brain. The MVP must prove fast ca
 ## Non-negotiable product rules
 
 - The daily note is the default product surface.
+- The main app page is `/`; the left rail main/home icon must point to `/`, not `/today`.
+- Product UI copy must stay in English.
 - The editor is the center of the app.
 - Side panels must support the note, not replace it.
 - The app must feel closer to Obsidian than Notion.
@@ -73,7 +75,11 @@ The product is an Obsidian-like company second brain. The MVP must prove fast ca
 - Autosave should debounce between 800 and 1200 ms and expose `saving`, `saved`, and `error` states.
 - Keyboard shortcuts such as Cmd+B and Cmd+I must work.
 - Slash commands are required early for tasks and checkboxes.
-- Text selection must support contextual actions such as moving selected text to a box or turning it into a task.
+- Text selection must support contextual actions such as turning selected text into a task.
+- Creating a new note from selected text and attaching that note to boxes is deferred until the note/box relationship UX is intentionally designed.
+- Documents and boxes have a many-to-many relationship through a relationship table; do not duplicate a document when linking it to a box.
+- The default catch-all box is labeled `Unsorted`, appears first on the main page, cannot be renamed or deleted, and can be modeled as a virtual/system view.
+- The main page box list shows top-level boxes only; child boxes appear inside their parent box page.
 
 ## Data and server rules
 

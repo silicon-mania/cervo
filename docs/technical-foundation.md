@@ -8,11 +8,15 @@ The product direction is an Obsidian-like company second brain: daily note first
 
 ## Product constraints that drive the tech
 
-- The app must open on the daily note by default.
+- The app must open on `/`, the main page. That page shows today's daily note by default plus the top-level boxes.
 - Capture must be immediate: type, paste, drag, drop, save.
 - The editor must feel closer to Obsidian than Notion.
 - The central note must never be replaced by secondary panels.
 - Boxes are the main project model: each box is both a page and a folder.
+- Notes and boxes have a many-to-many relationship; linking a note to a box must not duplicate the note.
+- The default box is named `Unsorted` in the UI and is a visible catch-all/untriaged view, not necessarily a normal user-managed `boxes` row.
+- Boxes may contain child boxes, so box navigation should support a familiar folder/path model.
+- Product UI copy must stay in English.
 - Search must work across daily notes, boxes, tasks, people, inbox items, and later files.
 - AI is an assistant around the workspace, not the main capture interface.
 - Auth is not part of the core demo value proposition, but workspace/company access is required from day one.
@@ -67,7 +71,7 @@ Vercel deployment
 - Search: no dedicated search table on day one; start with a SQL function over Postgres full-text search.
 - Calendar, inbox, and people/CRM are mocked in the database for the MVP.
 - Tests: Vitest for logic and Playwright for 2-3 critical flows, but tests are implemented only when explicitly requested.
-- TipTap MVP: basic shortcuts such as Cmd+B and Cmd+I, slash commands from the start, quick task/checkbox creation, and a selection menu for actions like moving text to a box or transforming text into a task.
+- TipTap MVP: basic shortcuts such as Cmd+B and Cmd+I, slash commands from the start, quick task/checkbox creation, and a selection menu for actions like transforming selected text into a task. Creating a new note from selected text and attaching it to boxes is deferred until that UX is intentionally designed.
 - AI provider path: OpenAI direct for the MVP. The implementation must stay centralized and easy to replace later, but switching to another provider path such as Vercel AI Gateway requires explicit human approval.
 - OpenAI model names must not be hardcoded inside features. Use centralized environment variables such as `OPENAI_MODEL_ASSISTANT` and `OPENAI_MODEL_STRUCTURED`.
 
@@ -407,6 +411,8 @@ Rule:
 └── src/proxy.ts
 ```
 
+`src/app/(app)/page.tsx` is the main product page and should be the left rail main/home destination. `/today` may remain as a compatibility route or redirect, but it is not the primary product navigation target.
+
 ## Component architecture
 
 ### `src/components/ui`
@@ -516,6 +522,7 @@ workspaces
 workspace_members
 documents
 boxes
+document_boxes
 tasks
 attachments
 people
@@ -559,7 +566,6 @@ updated_at
 id
 workspace_id
 type: daily_note | box_home | note
-box_id nullable
 date nullable
 title
 content_json
@@ -573,6 +579,7 @@ updated_at
 Justification:
 
 - Daily notes and box home pages use the same editor.
+- A note can belong to several boxes without content duplication.
 - Autosave is implemented once.
 - Search is implemented once.
 - AI context extraction is implemented once.
@@ -586,10 +593,33 @@ workspace_id
 name
 slug
 status: active | future | archived
+parent_box_id nullable
 home_document_id
 created_at
 updated_at
 ```
+
+`parent_box_id` supports nested boxes. Box pages should be able to render child boxes, notes/documents, and a breadcrumb or path-like navigation pattern.
+
+The default catch-all box is labeled `Unsorted` in the UI. It should not be treated as a normal editable project box unless a later implementation decision explicitly requires it. Prefer modeling it as a system/virtual view of untriaged notes, so it cannot be renamed or deleted and does not complicate normal box mutations.
+
+### `document_boxes`
+
+```txt
+id
+workspace_id
+document_id
+box_id
+created_by
+created_at
+```
+
+Rules:
+
+- Enforce uniqueness on `(document_id, box_id)`.
+- Use this table for daily notes and regular notes assigned to boxes.
+- Do not use this table for a box's own `home_document_id`; the home document relationship lives on `boxes`.
+- Adding a document to a box creates a relationship row only. It must not copy `documents.content_json` or create a duplicate document row.
 
 ### `tasks`
 
@@ -646,7 +676,7 @@ created_at
 5. Supabase Postgres + Drizzle schema.
 6. Documents table and daily note auto-creation.
 7. TipTap `DocumentEditor` with autosave.
-8. Boxes with `box_home` document.
+8. Boxes with `box_home` documents, `document_boxes` membership, and nested box support.
 9. Tasks linked to documents and boxes.
 10. Global search over `content_text`, boxes, tasks, people, and inbox items.
 11. DB-backed mock calendar, inbox, and people panels.

@@ -1,4 +1,5 @@
 import {
+  type AnyPgColumn,
   check,
   index,
   integer,
@@ -83,7 +84,13 @@ export const boxes = pgTable(
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     status: boxStatus("status").notNull().default("active"),
-    homeDocumentId: uuid("home_document_id"),
+    parentBoxId: uuid("parent_box_id").references(
+      (): AnyPgColumn => boxes.id,
+      { onDelete: "set null" },
+    ),
+    homeDocumentId: uuid("home_document_id").references(() => documents.id, {
+      onDelete: "set null",
+    }),
     ...timestamps,
   },
   (table) => ({
@@ -94,6 +101,10 @@ export const boxes = pgTable(
     workspaceStatusIdx: index("boxes_workspace_status_idx").on(
       table.workspaceId,
       table.status,
+    ),
+    workspaceParentIdx: index("boxes_workspace_parent_idx").on(
+      table.workspaceId,
+      table.parentBoxId,
     ),
   }),
 );
@@ -106,7 +117,6 @@ export const documents = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
     type: documentType("type").notNull(),
-    boxId: uuid("box_id").references(() => boxes.id, { onDelete: "set null" }),
     date: text("date"),
     title: text("title").notNull(),
     contentJson: jsonb("content_json").notNull().default({}),
@@ -132,6 +142,40 @@ export const documents = pgTable(
     workspaceDateIdx: index("documents_workspace_date_idx").on(
       table.workspaceId,
       table.date,
+    ),
+  }),
+);
+
+export const documentBoxes = pgTable(
+  "document_boxes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    boxId: uuid("box_id")
+      .notNull()
+      .references(() => boxes.id, { onDelete: "cascade" }),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    documentBoxIdx: uniqueIndex("document_boxes_document_box_idx").on(
+      table.documentId,
+      table.boxId,
+    ),
+    workspaceBoxIdx: index("document_boxes_workspace_box_idx").on(
+      table.workspaceId,
+      table.boxId,
+    ),
+    workspaceDocumentIdx: index("document_boxes_workspace_document_idx").on(
+      table.workspaceId,
+      table.documentId,
     ),
   }),
 );

@@ -15,6 +15,13 @@
       "when": 1780381549704,
       "tag": "0001_strange_nocturne",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780394835226,
+      "tag": "0002_narrow_scourge",
+      "breakpoints": true
     }
   ]
 }
