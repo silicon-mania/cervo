@@ -1,30 +1,30 @@
-"use server";
+'use server';
 
-import { and, eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { and, eq } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
 
-import { getDb } from "@/server/db/client";
-import { boxes, documents } from "@/server/db/schema";
-import { requireWorkspace } from "@/server/auth/require-workspace";
+import { getDb } from '@/server/db/client';
+import { boxes, documents } from '@/server/db/schema';
+import { requireWorkspace } from '@/server/auth/require-workspace';
 
-import { createBoxSchema, type CreateBoxInput } from "../schemas";
+import { createBoxSchema, type CreateBoxInput } from '../schemas';
+import { type CreateBoxActionState } from './types';
 
 const emptyDocumentContent = {
-  type: "doc",
+  type: 'doc',
   content: [],
 };
 
 function slugify(value: string) {
   const slug = value
     .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
     .slice(0, 64);
 
-  return slug || "box";
+  return slug || 'box';
 }
 
 async function getAvailableSlug({
@@ -64,13 +64,13 @@ export async function createBox(input: CreateBoxInput) {
       .where(
         and(
           eq(boxes.id, payload.parentBoxId),
-          eq(boxes.workspaceId, workspace.id),
-        ),
+          eq(boxes.workspaceId, workspace.id)
+        )
       )
       .limit(1);
 
     if (!parentBox) {
-      throw new Error("Parent box not found.");
+      throw new Error('Parent box not found.');
     }
   }
 
@@ -88,27 +88,31 @@ export async function createBox(input: CreateBoxInput) {
         name: payload.name,
         slug,
         parentBoxId: payload.parentBoxId,
-        status: "active",
+        status: 'active',
         createdAt: now,
         updatedAt: now,
       })
       .returning({
         id: boxes.id,
         name: boxes.name,
+        slug: boxes.slug,
+        status: boxes.status,
+        parentBoxId: boxes.parentBoxId,
+        homeDocumentId: boxes.homeDocumentId,
       });
 
     if (!box) {
-      throw new Error("Unable to create box.");
+      throw new Error('Unable to create box.');
     }
 
     const [homeDocument] = await tx
       .insert(documents)
       .values({
         workspaceId: workspace.id,
-        type: "box_home",
+        type: 'box_home',
         title: box.name,
         contentJson: emptyDocumentContent,
-        contentText: "",
+        contentText: '',
         createdBy: clerkUserId,
         updatedBy: clerkUserId,
         createdAt: now,
@@ -119,7 +123,7 @@ export async function createBox(input: CreateBoxInput) {
       });
 
     if (!homeDocument) {
-      throw new Error("Unable to create box home document.");
+      throw new Error('Unable to create box home document.');
     }
 
     const [updatedBox] = await tx
@@ -132,29 +136,49 @@ export async function createBox(input: CreateBoxInput) {
       .returning({
         id: boxes.id,
         name: boxes.name,
+        slug: boxes.slug,
+        status: boxes.status,
+        parentBoxId: boxes.parentBoxId,
+        homeDocumentId: boxes.homeDocumentId,
       });
 
     if (!updatedBox) {
-      throw new Error("Unable to link box home document.");
+      throw new Error('Unable to link box home document.');
     }
 
     return updatedBox;
   });
 }
 
-export async function createBoxAction(formData: FormData) {
-  const parentBoxIdValue = formData.get("parentBoxId");
-  const parentBoxId =
-    typeof parentBoxIdValue === "string" && parentBoxIdValue.length > 0
-      ? parentBoxIdValue
-      : undefined;
+export async function createBoxAction(
+  _previousState: CreateBoxActionState,
+  formData: FormData
+): Promise<CreateBoxActionState> {
+  try {
+    const parentBoxIdValue = formData.get('parentBoxId');
+    const parentBoxId =
+      typeof parentBoxIdValue === 'string' && parentBoxIdValue.length > 0
+        ? parentBoxIdValue
+        : undefined;
 
-  const box = await createBox({
-    name: String(formData.get("name") ?? ""),
-    parentBoxId,
-  });
+    const box = await createBox({
+      name: String(formData.get('name') ?? ''),
+      parentBoxId,
+    });
 
-  revalidatePath("/");
-  revalidatePath("/boxes/[boxId]", "page");
-  redirect(`/boxes/${box.id}`);
+    revalidatePath('/');
+
+    return {
+      status: 'success',
+      error: null,
+      box,
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      status: 'error',
+      error: error instanceof Error ? error.message : 'Unable to create box.',
+      box: null,
+    };
+  }
 }

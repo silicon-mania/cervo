@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from 'next/link';
 import {
   Brain,
   CalendarDays,
@@ -7,15 +7,15 @@ import {
   Search,
   Settings,
   type LucideIcon,
-} from "lucide-react";
+} from 'lucide-react';
 
-import { Panel, PanelHeader } from "@/components/primitives/panel";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Panel, PanelHeader } from '@/components/primitives/panel';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 const navItems = [
-  { href: "/", label: "Main", icon: Brain },
-  { href: "/tasks", label: "Tasks", icon: CheckSquare },
+  { href: '/', label: 'Main', icon: Brain },
+  { href: '/tasks', label: 'Tasks', icon: CheckSquare },
 ];
 
 function RailLink({
@@ -77,7 +77,7 @@ function RightRail() {
       <Panel className="min-h-36">
         <PanelHeader icon={Inbox} title="Inbox" />
       </Panel>
-      <Panel className="mt-auto min-h-48">
+      <Panel className="min-h-48">
         <PanelHeader icon={CalendarDays} title="Calendar" />
       </Panel>
     </aside>
@@ -99,21 +99,14 @@ export function AppShell({
         </nav>
         <RailLink href="/settings" label="Settings" icon={Settings} />
       </aside>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="grid h-14 shrink-0 grid-cols-[1fr_minmax(16rem,38rem)_1fr] items-center gap-4 border-b px-4">
-          <Link
-            href="/"
-            className="text-sm font-semibold tracking-normal text-foreground"
-          >
-            Cervo
-          </Link>
-          <GlobalSearch />
-          <div aria-hidden="true" />
-        </header>
-        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_18rem]">
-          <div className="min-w-0 overflow-hidden">{children}</div>
-          <RightRail />
+      <div className="flex min-w-0 flex-1">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="flex h-14 shrink-0 items-center justify-center px-4">
+            <GlobalSearch />
+          </header>
+          <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
         </div>
+        <RightRail />
       </div>
     </div>
   );

@@ -15,7 +15,7 @@ The product direction is an Obsidian-like company second brain: daily note first
 - Boxes are the main project model: each box is both a page and a folder.
 - Notes and boxes have a many-to-many relationship; linking a note to a box must not duplicate the note.
 - The default box is named `Unsorted` in the UI and is a visible catch-all/untriaged view, not necessarily a normal user-managed `boxes` row.
-- Boxes may contain child boxes, so box navigation should support a familiar folder/path model.
+- Boxes may contain child boxes, so box navigation should support a familiar folder/path model inside the main page `/`.
 - Product UI copy must stay in English.
 - Search must work across daily notes, boxes, tasks, people, inbox items, and later files.
 - AI is an assistant around the workspace, not the main capture interface.
@@ -411,7 +411,7 @@ Rule:
 └── src/proxy.ts
 ```
 
-`src/app/(app)/page.tsx` is the main product page and should be the left rail main/home destination. `/today` may remain as a compatibility route or redirect, but it is not the primary product navigation target.
+`src/app/(app)/page.tsx` is the main product page and should be the left rail main/home destination. `/today` may remain as a compatibility route or redirect, but it is not the primary product navigation target. Box opening should also stay on `/`; dedicated `/boxes/[boxId]` routes may exist only as compatibility redirects or future deep-link infrastructure, not as the MVP interaction.
 
 ## Component architecture
 
@@ -599,7 +599,7 @@ created_at
 updated_at
 ```
 
-`parent_box_id` supports nested boxes. Box pages should be able to render child boxes, notes/documents, and a breadcrumb or path-like navigation pattern.
+`parent_box_id` supports nested boxes. The main page boxes section should be able to render child boxes, notes/documents, and a breadcrumb or path-like navigation pattern without leaving `/`.
 
 The default catch-all box is labeled `Unsorted` in the UI. It should not be treated as a normal editable project box unless a later implementation decision explicitly requires it. Prefer modeling it as a system/virtual view of untriaged notes, so it cannot be renamed or deleted and does not complicate normal box mutations.
 

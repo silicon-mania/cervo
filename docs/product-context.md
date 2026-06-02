@@ -80,7 +80,9 @@ Boxes and notes have a many-to-many relationship. A note can belong to several b
 
 The default box is named `Unsorted` in the UI. It is a visible catch-all for notes that have not been sorted yet. It should not behave like a normal user-managed project box: it cannot be renamed or deleted, and it may be represented as a virtual/system view rather than a normal database row. A daily note can start in `Unsorted`, then be removed from it once the user has sorted the note into one or more specific boxes.
 
-Boxes can also contain child boxes. When a user is inside a box, the navigation model can borrow from familiar file/folder interfaces such as Google Drive: visible child boxes, notes/documents, and a clear path or breadcrumb.
+Boxes can also contain child boxes. Opening a box should happen inside the main page `/` as a smooth drill-down state in the boxes section, not by navigating to a separate route. The daily note area must remain stable while the boxes section changes. The navigation model can borrow from familiar file/folder interfaces such as Google Drive: visible child boxes, notes/documents, a back action, and a clear path or breadcrumb.
+
+For the current phase, notes shown inside boxes are not clickable. Opening a note from a box and temporarily replacing the daily note editor is a later workflow that needs a dedicated active-document state.
 
 ### Archives
 

@@ -60,21 +60,22 @@ The default app shape:
 ├──────────────┬─────────────────────────────┬────────────┤
 │ Icon rail    │ Main content                │ Right rail │
 │ Main/tasks   │ Daily note, then boxes      │ Inbox      │
-│ Settings     │ Box pages or task pages     │ Calendar   │
+│ Settings     │ Drill-down boxes or tasks   │ Calendar   │
 └──────────────┴─────────────────────────────┴────────────┘
 ```
 
 Rules:
 
-- A centered global search bar must stay available in the top bar across app pages, including the main page, tasks, settings, and box pages.
+- A centered global search bar must stay available in the top bar across app pages, including the main page, tasks, and settings.
+- The top search area should feel integrated into the page: no product name, no product logo, and no bottom border separating it from the main surface. The right rail starts at the top of the viewport, not below the search row.
 - The main page route is `/`. The left rail main/home icon opens `/`, not `/today`.
 - The left rail is icon-first and minimal. The main/home icon opens the default main page with today's note and boxes. The tasks icon opens a dedicated tasks page. Settings opens settings. Icon-only navigation items need hover tooltips.
 - The central editor keeps priority in width and visual hierarchy.
 - On the main page, the central scroll surface shows today's daily note first and boxes directly below it. The daily note should take roughly three quarters of the main content height in the default state, with the first boxes visible below the fold or near the bottom of the first viewport.
-- The main page box list shows all top-level boxes only. Child boxes are shown after opening their parent box, not in the main page top-level list.
+- The main page box list shows all top-level boxes only. Child boxes are shown after opening their parent box inside the same boxes section on `/`, not through a separate page navigation.
 - The `Unsorted` box appears first and should be visually differentiated from normal project boxes in a subtle way.
 - The daily note has an expansion control that grows the note section to fit its content for writing-focused sessions. Expanding the note should not hide the right rail.
-- Box lists should feel like a lightweight file/folder surface, not a dashboard. On box pages, child boxes, notes/documents, and breadcrumbs should support a familiar Google Drive-like navigation model.
+- Box lists should feel like a lightweight file/folder surface, not a dashboard. Opening a box uses a smooth drill-down state with back/breadcrumb controls, mixed child boxes and notes, and no route change away from `/`.
 - The right rail is simple for the current MVP interface: inbox on top, calendar/upcoming events on bottom. Do not build heavy panel behavior for it yet.
 - Bottom drawers may be used for mail, command output, or contextual tools.
 - Do not create multiple competing navigation systems.
@@ -170,6 +171,7 @@ Toast notifications:
 
 - Product UI copy must stay in English.
 - Keep labels short.
+- Avoid explanatory sublabels such as "Nested project spaces" or "Documents linked to this box" when the layout and icons already explain the surface.
 - Avoid explanatory marketing text inside the app.
 - Prefer concrete nouns: Today, Unsorted, Boxes, Tasks, Inbox, Calendar, People, Archive.
 - Empty states can be helpful, but should not become tutorials.

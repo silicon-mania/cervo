@@ -79,7 +79,9 @@ The product is an Obsidian-like company second brain. The MVP must prove fast ca
 - Creating a new note from selected text and attaching that note to boxes is deferred until the note/box relationship UX is intentionally designed.
 - Documents and boxes have a many-to-many relationship through a relationship table; do not duplicate a document when linking it to a box.
 - The default catch-all box is labeled `Unsorted`, appears first on the main page, cannot be renamed or deleted, and can be modeled as a virtual/system view.
-- The main page box list shows top-level boxes only; child boxes appear inside their parent box page.
+- The main page box list shows top-level boxes only; child boxes appear through a same-page drill-down state inside the boxes section on `/`.
+- Opening a box must not navigate away from `/` during the MVP interaction.
+- Linked notes inside boxes are not clickable until active-document state is intentionally designed.
 
 ## Data and server rules
 

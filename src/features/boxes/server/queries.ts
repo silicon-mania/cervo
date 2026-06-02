@@ -27,6 +27,10 @@ export type BoxDocumentSummary = {
   updatedAt: Date;
 };
 
+export type LinkedBoxDocumentSummary = BoxDocumentSummary & {
+  boxId: string;
+};
+
 export type BoxHomeDocument = BoxDocumentSummary & {
   contentJson: JSONContent;
   contentText: string;
@@ -128,6 +132,63 @@ export async function getUnsortedDocuments() {
       ),
     )
     .orderBy(asc(documents.title));
+}
+
+export async function getMainBoxesData() {
+  const { workspace } = await requireWorkspace();
+  const db = getDb();
+
+  const [allBoxes, unsortedDocuments, linkedDocuments] = await Promise.all([
+    db
+      .select(selectBoxSummaryFields())
+      .from(boxes)
+      .where(eq(boxes.workspaceId, workspace.id))
+      .orderBy(asc(boxes.name)),
+    db
+      .select(selectDocumentSummaryFields())
+      .from(documents)
+      .leftJoin(
+        documentBoxes,
+        and(
+          eq(documentBoxes.documentId, documents.id),
+          eq(documentBoxes.workspaceId, workspace.id),
+        ),
+      )
+      .where(
+        and(
+          eq(documents.workspaceId, workspace.id),
+          ne(documents.type, "box_home"),
+          isNull(documentBoxes.id),
+        ),
+      )
+      .orderBy(asc(documents.title)),
+    db
+      .select({
+        ...selectDocumentSummaryFields(),
+        boxId: documentBoxes.boxId,
+      })
+      .from(documentBoxes)
+      .innerJoin(
+        documents,
+        and(
+          eq(documents.id, documentBoxes.documentId),
+          eq(documents.workspaceId, workspace.id),
+        ),
+      )
+      .where(
+        and(
+          eq(documentBoxes.workspaceId, workspace.id),
+          ne(documents.type, "box_home"),
+        ),
+      )
+      .orderBy(asc(documents.title)),
+  ]);
+
+  return {
+    boxes: allBoxes,
+    unsortedDocuments,
+    linkedDocuments,
+  };
 }
 
 async function getBreadcrumbs({

@@ -123,20 +123,20 @@ Build:
 - Make `/` the main product page and left rail main/home destination. `/today` may remain as a compatibility route or redirect, but it is no longer the primary navigation target.
 - Update the main page so today's note and all top-level boxes are visible on the same page: daily note first, boxes directly below.
 - Show `Unsorted` first and visually distinguish it subtly from normal project boxes.
-- Do not show child boxes in the main page top-level box list; child boxes appear when their parent box is opened.
+- Do not show child boxes in the main page top-level box list; child boxes appear when their parent box is opened in a smooth drill-down state inside the boxes section.
 - Keep the left icon rail minimal: main page, tasks page, settings, with tooltips on hover.
-- Add `/boxes/[boxId]`.
-- Render the box home document with the shared `DocumentEditor`.
+- Keep the user on `/` when opening a box; do not navigate to `/boxes/[boxId]` for the main interaction.
+- Mix child boxes and linked notes in one simple grid for now, without explanatory section sublabels.
+- Defer opening a linked note in the main editor until active-document state is intentionally designed.
 - Support box statuses: `active`, `future`, `archived`.
 - Keep the right rail simple: inbox on top, calendar/upcoming events on bottom.
 
 Acceptance criteria:
 
 - A user can create a box.
-- Opening a box shows its home document.
 - Box documents use the same editor and autosave path as daily notes.
 - A document can be linked to more than one box without being duplicated.
-- A box can show child boxes and linked notes/documents.
+- A box can show child boxes and linked notes/documents inside the boxes section on `/`.
 - The main page at `/` shows today's note, `Unsorted`, and all top-level boxes in one continuous central surface.
 
 ## Phase 5: Slash commands and selection actions
@@ -265,7 +265,7 @@ The next sprint should focus on:
 1. Finalize the Phase 4 main-page interface direction before coding.
 2. Add box data support: `boxes`, `document_boxes`, `parent_box_id`, and automatic `box_home` documents.
 3. Update the app shell: centered global search, minimal left icon rail pointing main/home to `/`, main page with daily note plus top-level boxes, and simple right rail.
-4. Add `/boxes/[boxId]` with box home documents using the shared `DocumentEditor`.
+4. Keep box opening as a same-page drill-down interaction inside `/`.
 5. Verify the connected UI flow using `docs/connected-ui-testing.md` once implementation starts.
 
 This is the shortest path from the implemented daily-note/autosave foundation to the project-box mental model.

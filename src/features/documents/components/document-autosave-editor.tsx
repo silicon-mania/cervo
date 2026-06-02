@@ -1,17 +1,14 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Check, LoaderCircle, Maximize2, Minimize2 } from "lucide-react";
-import type { JSONContent } from "@tiptap/react";
+import { useState } from 'react';
+import { Check, LoaderCircle, Maximize2, Minimize2 } from 'lucide-react';
+import type { JSONContent } from '@tiptap/react';
 
-import {
-  DocumentEditor,
-  type DocumentEditorValue,
-} from "@/components/editor";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { DocumentEditor, type DocumentEditorValue } from '@/components/editor';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
-import { useDocumentAutosave } from "../hooks/use-document-autosave";
+import { useDocumentAutosave } from '../hooks/use-document-autosave';
 
 type DocumentAutosaveEditorProps = {
   documentId: string;
@@ -28,14 +25,14 @@ function AutosaveStatus({
   status,
   errorMessage,
 }: {
-  status: "idle" | "saving" | "saved" | "error";
+  status: 'idle' | 'saving' | 'saved' | 'error';
   errorMessage: string | null;
 }) {
-  if (status === "idle") {
+  if (status === 'idle') {
     return null;
   }
 
-  if (status === "saving") {
+  if (status === 'saving') {
     return (
       <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
         <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
@@ -44,10 +41,10 @@ function AutosaveStatus({
     );
   }
 
-  if (status === "error") {
+  if (status === 'error') {
     return (
       <div className="inline-flex items-center gap-2 text-sm text-destructive">
-        <span>{errorMessage ?? "Couldn’t save changes."}</span>
+        <span>{errorMessage ?? 'Couldn’t save changes.'}</span>
       </div>
     );
   }
@@ -55,8 +52,8 @@ function AutosaveStatus({
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-2 text-sm text-muted-foreground",
-        "transition-opacity",
+        'inline-flex items-center gap-2 text-sm text-muted-foreground',
+        'transition-opacity'
       )}
     >
       <Check className="h-3.5 w-3.5 opacity-50" />
@@ -69,7 +66,7 @@ export function DocumentAutosaveEditor({
   documentId,
   title,
   initialContent,
-  placeholder = "Dump your mind...",
+  placeholder = 'Dump your mind...',
   autofocus = false,
   expandable = false,
   titleClassName,
@@ -88,20 +85,19 @@ export function DocumentAutosaveEditor({
   return (
     <section
       className={cn(
-        "flex flex-col gap-4",
-        expandable && "min-h-[calc((100svh-3.5rem)*0.72)]",
-        isDefaultConstrained &&
-          "h-[calc((100svh-3.5rem)*0.72)] min-h-[440px]",
-        isExpanded && "min-h-[calc(100svh-3.5rem)]",
-        sectionClassName,
+        'flex flex-col gap-4 rounded-md border border-dashed bg-muted/30 p-4',
+        expandable && 'min-h-[calc((100svh-3.5rem)*0.72)]',
+        isDefaultConstrained && 'h-[calc((100svh-3.5rem)*0.72)] min-h-[440px]',
+        isExpanded && 'min-h-[calc(100svh-3.5rem)]',
+        sectionClassName
       )}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h1
             className={cn(
-              "truncate text-3xl font-semibold tracking-normal",
-              titleClassName,
+              'truncate text-3xl font-semibold tracking-normal',
+              titleClassName
             )}
           >
             {title}
@@ -114,7 +110,7 @@ export function DocumentAutosaveEditor({
               type="button"
               variant="ghost"
               size="icon-sm"
-              aria-label={isExpanded ? "Collapse note" : "Expand note"}
+              aria-label={isExpanded ? 'Collapse note' : 'Expand note'}
               onClick={() => setIsExpanded((current) => !current)}
             >
               {isExpanded ? (
@@ -132,9 +128,9 @@ export function DocumentAutosaveEditor({
         autofocus={autofocus}
         onChange={onChange}
         className={cn(
-          "min-h-0 flex-1 border-t border-border/60 pt-4",
-          isDefaultConstrained && "overflow-y-auto",
-          isExpanded && "overflow-visible",
+          'min-h-0 flex-1',
+          isDefaultConstrained && 'overflow-y-auto',
+          isExpanded && 'overflow-visible'
         )}
         editorClassName="min-h-[420px]"
       />
