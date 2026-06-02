@@ -57,7 +57,7 @@ Acceptance criteria:
 
 ## Phase 2: Shared TipTap `DocumentEditor`
 
-Status: after Phase 1.
+Status: implemented.
 
 Goal: every editable document uses one shared editor foundation.
 
@@ -78,7 +78,7 @@ Acceptance criteria:
 
 ## Phase 3: Autosave
 
-Status: after Phase 2.
+Status: implemented.
 
 Goal: the daily note should persist without a manual save flow.
 
@@ -88,11 +88,14 @@ Build:
 - Debounce saves between 800 and 1200 ms.
 - Persist `content_json`, `content_text`, and `updated_by`.
 - Show subtle `saving`, `saved`, and `error` states without exposing timestamps or technical metadata.
+- Do not show a saving animation while the user is still inside the debounce window and no network save has started yet.
 - Use a tiny inline loader while saving.
 - Use a small low-opacity check icon when all changes are saved.
+- Keep autosave status near the daily note title rather than as a separate metadata row under the title.
 - Show an error state only when saving fails.
 - Avoid toast notifications for normal autosave status.
 - Do not add a primary manual save button.
+- Flush pending editor content with a best-effort page-hide/unload save so abrupt tab closes do not depend only on the debounce timer.
 
 Acceptance criteria:
 

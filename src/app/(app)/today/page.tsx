@@ -1,9 +1,9 @@
 import { CalendarDays, Inbox, Sparkles } from "lucide-react";
 
-import { DocumentEditor } from "@/components/editor";
 import { AppShell } from "@/components/layout/app-shell";
 import { Panel, PanelHeader } from "@/components/primitives/panel";
 import { getOrCreateTodayDocument } from "@/features/daily-notes";
+import { TodayEditor } from "@/features/daily-notes/components/today-editor";
 
 export default async function TodayPage() {
   const { document } = await getOrCreateTodayDocument();
@@ -13,15 +13,10 @@ export default async function TodayPage() {
       <main className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px]">
         <section className="min-w-0 border-r bg-background px-10 py-8">
           <div className="mx-auto max-w-3xl space-y-6">
-            <div>
-              <h1 className="text-3xl font-semibold tracking-normal">
-                {document.title}
-              </h1>
-            </div>
-            <DocumentEditor
+            <TodayEditor
+              documentId={document.id}
+              title={document.title}
               initialContent={document.contentJson}
-              placeholder="Dump your mind..."
-              autofocus
             />
           </div>
         </section>
