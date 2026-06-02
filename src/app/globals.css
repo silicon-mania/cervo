@@ -129,3 +129,51 @@
     @apply font-sans;
   }
 }
+
+@layer components {
+  .cervo-document-editor .ProseMirror {
+    @apply min-h-[560px] outline-none;
+  }
+
+  .cervo-document-editor .ProseMirror p.is-editor-empty:first-child::before {
+    @apply pointer-events-none float-left h-0 text-muted-foreground;
+    content: attr(data-placeholder);
+  }
+
+  .cervo-document-editor .ProseMirror p {
+    @apply my-3;
+  }
+
+  .cervo-document-editor .ProseMirror a {
+    @apply cursor-pointer underline underline-offset-2;
+  }
+
+  .cervo-document-editor .ProseMirror ul,
+  .cervo-document-editor .ProseMirror ol {
+    @apply my-3 pl-6;
+  }
+
+  .cervo-document-editor .ProseMirror ul {
+    @apply list-disc;
+  }
+
+  .cervo-document-editor .ProseMirror ol {
+    @apply list-decimal;
+  }
+
+  .cervo-document-editor .ProseMirror ul[data-type="taskList"] {
+    @apply list-none pl-0;
+  }
+
+  .cervo-document-editor .ProseMirror li[data-type="taskItem"] {
+    @apply flex gap-2;
+  }
+
+  .cervo-document-editor .ProseMirror li[data-type="taskItem"] > label {
+    @apply mt-1 shrink-0;
+  }
+
+  .cervo-document-editor .ProseMirror li[data-type="taskItem"] > div {
+    @apply min-w-0 flex-1;
+  }
+}

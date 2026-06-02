@@ -3,6 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "@/server/db/client";
 import { documents } from "@/server/db/schema";
 import { requireWorkspace } from "@/server/auth/require-workspace";
+import type { JSONContent } from "@tiptap/react";
 
 import {
   getAppTimeZone,
@@ -19,6 +20,7 @@ export type DailyNote = {
   id: string;
   title: string;
   date: string;
+  contentJson: JSONContent;
   contentText: string;
   createdAt: Date;
   updatedAt: Date;
@@ -31,6 +33,7 @@ function selectDailyNoteFields() {
     id: documents.id,
     title: documents.title,
     date: documents.date,
+    contentJson: documents.contentJson,
     contentText: documents.contentText,
     createdAt: documents.createdAt,
     updatedAt: documents.updatedAt,
@@ -40,7 +43,10 @@ function selectDailyNoteFields() {
 }
 
 function assertDailyNoteDate(
-  document: Omit<DailyNote, "date"> & { date: string | null },
+  document: Omit<DailyNote, "date" | "contentJson"> & {
+    date: string | null;
+    contentJson: unknown;
+  },
 ): DailyNote {
   if (!document.date) {
     throw new Error("Daily note is missing a date.");
@@ -49,6 +55,7 @@ function assertDailyNoteDate(
   return {
     ...document,
     date: document.date,
+    contentJson: document.contentJson as JSONContent,
   };
 }
 

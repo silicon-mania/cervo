@@ -1,11 +1,12 @@
 import { CalendarDays, Inbox, Sparkles } from "lucide-react";
 
+import { DocumentEditor } from "@/components/editor";
 import { AppShell } from "@/components/layout/app-shell";
 import { Panel, PanelHeader } from "@/components/primitives/panel";
 import { getOrCreateTodayDocument } from "@/features/daily-notes";
 
 export default async function TodayPage() {
-  await getOrCreateTodayDocument();
+  const { document } = await getOrCreateTodayDocument();
 
   return (
     <AppShell>
@@ -14,12 +15,13 @@ export default async function TodayPage() {
           <div className="mx-auto max-w-3xl space-y-6">
             <div>
               <h1 className="text-3xl font-semibold tracking-normal">
-                Daily note
+                {document.title}
               </h1>
             </div>
-            <div
-              aria-label="Daily note editor"
-              className="min-h-[560px] rounded-md border border-dashed bg-muted/20"
+            <DocumentEditor
+              initialContent={document.contentJson}
+              placeholder="Dump your mind..."
+              autofocus
             />
           </div>
         </section>
