@@ -7,6 +7,7 @@ Before coding, read:
 - `docs/product-context.md`.
 - `docs/technical-foundation.md`.
 - `docs/design-system.md`.
+- `docs/mvp-development-roadmap.md`.
 - `docs/connected-ui-testing.md` when testing authenticated UI flows.
 
 The product is an Obsidian-like company second brain. The MVP must prove fast capture, daily note, boxes, search, and contextual AI. Do not optimize for a generic SaaS dashboard.
@@ -17,6 +18,7 @@ The product is an Obsidian-like company second brain. The MVP must prove fast ca
 - The editor is the center of the app.
 - Side panels must support the note, not replace it.
 - The app must feel closer to Obsidian than Notion.
+- Follow the implementation order in `docs/mvp-development-roadmap.md` unless the developer explicitly changes priorities.
 - Do not build a landing page unless explicitly requested.
 - Do not add collaboration, sharing, desktop, mobile, queues, or complex permissions unless explicitly requested.
 

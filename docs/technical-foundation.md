@@ -62,6 +62,7 @@ Vercel deployment
 - Database access: Drizzle + server-only Postgres connection.
 - Supabase RLS strategy for MVP: no browser-side DB access; authorization lives in the Next.js server layer using Clerk `orgId`.
 - Initial theme: light-first, subtle off-white/gray background, discreet panels.
+- Daily note date key: resolve "today" on the server with `CERVO_APP_TIME_ZONE`, defaulting to `America/Los_Angeles` for the San Francisco-focused MVP. Do not use the deployment server timezone or browser-provided workspace ids for Phase 1. A future user/workspace timezone preference can replace this centralized default.
 - Autosave: mandatory TipTap debounce between 800 and 1200 ms with `saving`, `saved`, and `error` status. No manual save as the primary flow.
 - Search: no dedicated search table on day one; start with a SQL function over Postgres full-text search.
 - Calendar, inbox, and people/CRM are mocked in the database for the MVP.

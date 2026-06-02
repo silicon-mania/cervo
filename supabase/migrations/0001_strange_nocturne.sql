@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "documents_daily_note_workspace_date_idx" ON "documents" USING btree ("workspace_id","date") WHERE "documents"."type" = 'daily_note';--> statement-breakpoint
+ALTER TABLE "documents" ADD CONSTRAINT "documents_daily_note_date_required_chk" CHECK ("documents"."type" <> 'daily_note' OR "documents"."date" IS NOT NULL);

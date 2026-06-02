@@ -1,4 +1,5 @@
 import {
+  check,
   index,
   integer,
   jsonb,
@@ -9,6 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const documentType = pgEnum("document_type", [
   "daily_note",
@@ -114,6 +116,15 @@ export const documents = pgTable(
     ...timestamps,
   },
   (table) => ({
+    dailyNoteDateRequiredChk: check(
+      "documents_daily_note_date_required_chk",
+      sql`${table.type} <> 'daily_note' OR ${table.date} IS NOT NULL`,
+    ),
+    dailyNoteWorkspaceDateIdx: uniqueIndex(
+      "documents_daily_note_workspace_date_idx",
+    )
+      .on(table.workspaceId, table.date)
+      .where(sql`${table.type} = 'daily_note'`),
     workspaceTypeIdx: index("documents_workspace_type_idx").on(
       table.workspaceId,
       table.type,
