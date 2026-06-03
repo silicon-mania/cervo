@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, FileText, LoaderCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -15,9 +15,14 @@ import type {
   BoxSummary,
   RootMemoryData,
 } from "@/features/boxes/server/queries";
+import {
+  editorDocumentQueryKey,
+  fetchEditorDocument,
+} from "@/features/documents/client/queries";
 
 type BoxesExplorerProps = {
   initialMemoryData: RootMemoryData;
+  openDocumentError?: string | null;
   loadingDocumentId?: string | null;
   onOpenDocument?: (documentId: string) => void;
 };
@@ -102,9 +107,11 @@ function NoteCard({
 
 export function BoxesExplorer({
   initialMemoryData,
+  openDocumentError,
   loadingDocumentId,
   onOpenDocument,
 }: BoxesExplorerProps) {
+  const queryClient = useQueryClient();
   const [activeTarget, setActiveTarget] = useState<ActiveTarget>({
     type: "root",
   });
@@ -160,6 +167,15 @@ export function BoxesExplorer({
 
     return [];
   }, [activeTarget.type, boxMemory?.documents, isOptimisticBoxTarget, rootMemory.unsortedDocuments]);
+
+  useEffect(() => {
+    for (const document of visibleDocuments) {
+      queryClient.prefetchQuery({
+        queryKey: editorDocumentQueryKey(document.id),
+        queryFn: () => fetchEditorDocument(document.id),
+      });
+    }
+  }, [queryClient, visibleDocuments]);
 
   const openBox = useCallback(
     (box: BoxSummary) => {
@@ -338,6 +354,14 @@ export function BoxesExplorer({
           className="mt-5 rounded-md border border-dashed p-4 text-sm text-muted-foreground"
           role="alert">
           Memory could not load. Try again in a moment.
+        </div>
+      ) : null}
+
+      {openDocumentError ? (
+        <div
+          className="mt-5 rounded-md border border-dashed p-4 text-sm text-muted-foreground"
+          role="alert">
+          {openDocumentError}
         </div>
       ) : null}
 

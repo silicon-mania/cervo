@@ -1,8 +1,13 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { DocumentEditorValue } from "@/components/editor";
+import {
+  editorDocumentQueryKey,
+  type EditorDocument,
+} from "@/features/documents/client/queries";
 
 const AUTOSAVE_DELAY_MS = 1000;
 
@@ -23,6 +28,7 @@ export function useDocumentAutosave({
   dailyNoteDate,
   onDocumentPersisted,
 }: UseDocumentAutosaveOptions) {
+  const queryClient = useQueryClient();
   const persistedDocumentIdRef = useRef(documentId ?? null);
   const latestDraftRevisionRef = useRef(0);
   const latestDraftRef = useRef<DocumentAutosaveValue | null>(null);
@@ -48,19 +54,42 @@ export function useDocumentAutosave({
     return null;
   }, [dailyNoteDate]);
 
-  const handleChange = useCallback((value: DocumentAutosaveValue) => {
-    latestDraftRef.current = value;
-    setDraft(value);
-    setDraftRevision((revision) => {
-      const nextRevision = revision + 1;
+  const handleChange = useCallback(
+    (value: DocumentAutosaveValue) => {
+      const persistedDocumentId = persistedDocumentIdRef.current;
 
-      latestDraftRevisionRef.current = nextRevision;
+      latestDraftRef.current = value;
+      setDraft(value);
+      setDraftRevision((revision) => {
+        const nextRevision = revision + 1;
 
-      return nextRevision;
-    });
-    setErrorMessage(null);
-    setStatus("idle");
-  }, []);
+        latestDraftRevisionRef.current = nextRevision;
+
+        return nextRevision;
+      });
+      setErrorMessage(null);
+      setStatus("idle");
+
+      if (persistedDocumentId) {
+        queryClient.setQueryData<EditorDocument>(
+          editorDocumentQueryKey(persistedDocumentId),
+          (cachedDocument) => {
+            if (!cachedDocument) {
+              return cachedDocument;
+            }
+
+            return {
+              ...cachedDocument,
+              title: value.title,
+              contentJson: value.contentJson,
+              contentText: value.contentText,
+            };
+          },
+        );
+      }
+    },
+    [queryClient],
+  );
 
   const saveDraft = useCallback(
     async (revision: number, value: DocumentAutosaveValue) => {

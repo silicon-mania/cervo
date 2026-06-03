@@ -1,12 +1,19 @@
 "use client";
 
 import type { JSONContent } from "@tiptap/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { QueryProvider } from "@/components/providers/query-provider";
 import { BoxesExplorer } from "@/features/boxes/components/boxes-explorer";
 import type { RootMemoryData } from "@/features/boxes/server/queries";
 import { TodayEditor } from "@/features/daily-notes/components/today-editor";
+import {
+  editorDocumentQueryKey,
+  fetchEditorDocument,
+  getCachedEditorDocument,
+  type EditorDocument,
+} from "@/features/documents/client/queries";
 
 type ActiveEditorDocument = {
   clientKey: string;
@@ -24,35 +31,52 @@ type MainWorkspaceProps = {
   initialMemoryData: RootMemoryData;
 };
 
-type DocumentResponse = {
-  document?: Omit<ActiveEditorDocument, "clientKey" | "persistence">;
-  error?: string;
-};
-
 export function MainWorkspace({ initialDocument, initialMemoryData }: MainWorkspaceProps) {
+  return (
+    <QueryProvider>
+      <MainWorkspaceContent initialDocument={initialDocument} initialMemoryData={initialMemoryData} />
+    </QueryProvider>
+  );
+}
+
+function buildPersistedEditorDocument(document: EditorDocument): ActiveEditorDocument {
+  return {
+    ...document,
+    clientKey: `document:${document.id}`,
+    persistence: "persisted",
+  };
+}
+
+function MainWorkspaceContent({ initialDocument, initialMemoryData }: MainWorkspaceProps) {
+  const queryClient = useQueryClient();
   const [activeDocument, setActiveDocument] = useState(initialDocument);
   const [loadingDocumentId, setLoadingDocumentId] = useState<string | null>(null);
+  const [openDocumentError, setOpenDocumentError] = useState<string | null>(null);
 
   const handleOpenDocument = async (documentId: string) => {
     if (activeDocument.id === documentId || loadingDocumentId === documentId) {
       return;
     }
 
+    setOpenDocumentError(null);
+
+    const cachedDocument = getCachedEditorDocument(queryClient, documentId);
+    if (cachedDocument) {
+      setActiveDocument(buildPersistedEditorDocument(cachedDocument));
+      return;
+    }
+
     setLoadingDocumentId(documentId);
 
     try {
-      const response = await fetch(`/api/documents/${documentId}`);
-      const payload = (await response.json().catch(() => null)) as DocumentResponse | null;
-
-      if (!response.ok || !payload?.document) {
-        throw new Error(payload?.error ?? "Unable to open document.");
-      }
-
-      setActiveDocument({
-        ...payload.document,
-        clientKey: `document:${payload.document.id}`,
-        persistence: "persisted",
+      const document = await queryClient.fetchQuery({
+        queryKey: editorDocumentQueryKey(documentId),
+        queryFn: () => fetchEditorDocument(documentId),
       });
+
+      setActiveDocument(buildPersistedEditorDocument(document));
+    } catch {
+      setOpenDocumentError("Document could not open. Try again in a moment.");
     } finally {
       setLoadingDocumentId(null);
     }
@@ -85,13 +109,12 @@ export function MainWorkspace({ initialDocument, initialMemoryData }: MainWorksp
         onDocumentPersisted={handleDocumentPersisted}
       />
 
-      <QueryProvider>
-        <BoxesExplorer
-          initialMemoryData={initialMemoryData}
-          loadingDocumentId={loadingDocumentId}
-          onOpenDocument={handleOpenDocument}
-        />
-      </QueryProvider>
+      <BoxesExplorer
+        initialMemoryData={initialMemoryData}
+        openDocumentError={openDocumentError}
+        loadingDocumentId={loadingDocumentId}
+        onOpenDocument={handleOpenDocument}
+      />
     </>
   );
 }
