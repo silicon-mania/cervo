@@ -12,6 +12,7 @@ import {
   type UpdateBoxInput,
   updateBoxSchema,
 } from "../schemas";
+import { splitDeletedSubtreeDocumentIds } from "./deletion";
 import { getBoxSummaryForWorkspace, type BoxDocumentSummary, type BoxSummary } from "./queries";
 
 function slugify(value: string) {
@@ -210,12 +211,10 @@ export async function deleteBox(boxId: string): Promise<DeleteBoxResult> {
         outsidePlacements.map((placement) => placement.documentId),
       );
 
-      preservedDocumentIds = candidateDocumentIds.filter((documentId) =>
-        outsidePlacementDocumentIds.has(documentId),
-      );
-      deletedDocumentIds = candidateDocumentIds.filter(
-        (documentId) => !outsidePlacementDocumentIds.has(documentId),
-      );
+      ({ deletedDocumentIds, preservedDocumentIds } = splitDeletedSubtreeDocumentIds({
+        linkedDocumentIds: candidateDocumentIds,
+        outsidePlacementDocumentIds: Array.from(outsidePlacementDocumentIds),
+      }));
 
       if (deletedDocumentIds.length > 0) {
         await tx

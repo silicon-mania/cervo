@@ -20,6 +20,10 @@ _Avoid_: Recursive contents, total contents
 A document that can be placed in a box or left unsorted.
 _Avoid_: File
 
+**Box Placement**:
+The relationship that places one note inside one box without duplicating the note.
+_Avoid_: Copy, link, membership
+
 **Daily Note**:
 A note for one calendar day that appears by default in the editor when the user has not chosen another note. There can be only one daily note per day, and it can be replaced by a new blank daily note if the editor needs a default note after deletion.
 _Avoid_: Journal entry, separate document type

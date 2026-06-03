@@ -13,6 +13,7 @@ App/repository path: `/Users/hugobayoud/prog/silicon-mania/cervo`.
 3. `design-system.md` — UX/UI principles and visual rules.
 4. `ai-rules.md` — rules that AI coding agents must follow when editing the project.
 5. `connected-ui-testing.md` — authenticated UI testing workflow for local/staging Clerk test users.
+6. `memory-regression-coverage.md` — Memory refactor regression coverage and connected verification checklist.
 
 ## Documentation roles
 
@@ -21,6 +22,7 @@ App/repository path: `/Users/hugobayoud/prog/silicon-mania/cervo`.
 - `design-system.md` answers how the app should feel and look.
 - `ai-rules.md` answers how AI agents must behave while coding.
 - `connected-ui-testing.md` answers how AI agents can test connected UI flows without asking for real credentials.
+- `memory-regression-coverage.md` answers how to verify Memory refactor behavior stays intact.
 
 ## Rule
 
