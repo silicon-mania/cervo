@@ -1,11 +1,16 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 
 import { getDb } from "@/server/db/client";
-import { boxes } from "@/server/db/schema";
+import { boxes, documentBoxes, documents } from "@/server/db/schema";
 import { requireWorkspace } from "@/server/auth/require-workspace";
 
-import { createBoxSchema, type CreateBoxInput } from "../schemas";
-import type { BoxSummary } from "./queries";
+import {
+  boxPlacementRequestSchema,
+  createBoxSchema,
+  type BoxPlacementRequestInput,
+  type CreateBoxInput,
+} from "../schemas";
+import type { BoxDocumentSummary, BoxSummary } from "./queries";
 
 function slugify(value: string) {
   const slug = value
@@ -93,4 +98,137 @@ export async function createBox(input: CreateBoxInput): Promise<BoxSummary> {
   }
 
   return box;
+}
+
+type BoxPlacementMutationInput = BoxPlacementRequestInput & {
+  documentId: string;
+};
+
+export type BoxPlacementMutationResult = {
+  box: BoxSummary;
+  document: BoxDocumentSummary;
+};
+
+function serializeDocumentSummary(document: {
+  id: string;
+  title: string;
+  type: "daily_note" | "box_home" | "note";
+  date: string | null;
+  updatedAt: Date;
+}): BoxDocumentSummary {
+  return {
+    id: document.id,
+    title: document.title,
+    type: document.type,
+    date: document.date,
+    updatedAt: document.updatedAt.toISOString(),
+  };
+}
+
+async function getPlacementMutationSubjects({
+  documentId,
+  boxId,
+  workspaceId,
+}: BoxPlacementMutationInput & {
+  workspaceId: string;
+}) {
+  const db = getDb();
+
+  const [[document], [box]] = await Promise.all([
+    db
+      .select({
+        id: documents.id,
+        title: documents.title,
+        type: documents.type,
+        date: documents.date,
+        updatedAt: documents.updatedAt,
+      })
+      .from(documents)
+      .where(
+        and(
+          eq(documents.id, documentId),
+          eq(documents.workspaceId, workspaceId),
+          ne(documents.type, "box_home"),
+        ),
+      )
+      .limit(1),
+    db
+      .select({
+        id: boxes.id,
+        name: boxes.name,
+        slug: boxes.slug,
+        status: boxes.status,
+        parentBoxId: boxes.parentBoxId,
+        homeDocumentId: boxes.homeDocumentId,
+      })
+      .from(boxes)
+      .where(and(eq(boxes.id, boxId), eq(boxes.workspaceId, workspaceId)))
+      .limit(1),
+  ]);
+
+  if (!document) {
+    throw new Error("Document not found.");
+  }
+
+  if (!box) {
+    throw new Error("Box not found.");
+  }
+
+  return {
+    document: serializeDocumentSummary(document),
+    box,
+  };
+}
+
+export async function placeDocumentInBox(
+  input: BoxPlacementMutationInput,
+): Promise<BoxPlacementMutationResult> {
+  const payload = boxPlacementRequestSchema.parse({ boxId: input.boxId });
+  const { clerkUserId, workspace } = await requireWorkspace();
+  const db = getDb();
+  const subjects = await getPlacementMutationSubjects({
+    documentId: input.documentId,
+    boxId: payload.boxId,
+    workspaceId: workspace.id,
+  });
+
+  await db
+    .insert(documentBoxes)
+    .values({
+      workspaceId: workspace.id,
+      documentId: input.documentId,
+      boxId: payload.boxId,
+      createdBy: clerkUserId,
+      createdAt: new Date(),
+    })
+    .onConflictDoNothing({
+      target: [documentBoxes.documentId, documentBoxes.boxId],
+    });
+
+  return subjects;
+}
+
+export async function removeDocumentFromBox(
+  input: BoxPlacementMutationInput,
+): Promise<BoxPlacementMutationResult> {
+  const payload = boxPlacementRequestSchema.parse({ boxId: input.boxId });
+  const { workspace } = await requireWorkspace();
+  const db = getDb();
+  const subjects = await getPlacementMutationSubjects({
+    documentId: input.documentId,
+    boxId: payload.boxId,
+    workspaceId: workspace.id,
+  });
+
+  await db
+    .delete(documentBoxes)
+    .where(
+      and(
+        eq(documentBoxes.workspaceId, workspace.id),
+        eq(documentBoxes.documentId, input.documentId),
+        eq(documentBoxes.boxId, payload.boxId),
+      ),
+    );
+
+  return subjects;
 }

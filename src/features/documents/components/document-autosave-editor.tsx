@@ -1,6 +1,6 @@
 "use client";
 
-import { type ChangeEvent, useRef, useState } from "react";
+import { type ChangeEvent, type ReactNode, useRef, useState } from "react";
 import { Check, LoaderCircle, Maximize2, Minimize2 } from "lucide-react";
 import type { JSONContent } from "@tiptap/react";
 
@@ -21,6 +21,7 @@ type DocumentAutosaveEditorProps = {
   expandable?: boolean;
   titleClassName?: string;
   sectionClassName?: string;
+  actions?: ReactNode;
   onDocumentPersisted?: (documentId: string) => void;
 };
 
@@ -75,6 +76,7 @@ export function DocumentAutosaveEditor({
   expandable = false,
   titleClassName,
   sectionClassName,
+  actions,
   onDocumentPersisted,
 }: DocumentAutosaveEditorProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -136,6 +138,7 @@ export function DocumentAutosaveEditor({
         </div>
         <div className="flex min-h-10 shrink-0 items-center gap-2">
           <AutosaveStatus status={status} errorMessage={errorMessage} />
+          {actions}
           {expandable ? (
             <Button
               type="button"

@@ -33,6 +33,12 @@ export type BoxMemoryData = {
   documents: BoxDocumentSummary[];
 };
 
+export type DocumentBoxPlacementsData = {
+  boxes: BoxSummary[];
+  placements: BoxSummary[];
+  document: BoxDocumentSummary;
+};
+
 function selectBoxSummaryFields() {
   return {
     id: boxes.id,
@@ -185,5 +191,53 @@ export async function getBoxMemoryData(boxId: string): Promise<BoxMemoryData> {
     path,
     childBoxes,
     documents: excludeBoxHomeDocumentIds(linkedDocuments, homeDocumentIds),
+  };
+}
+
+export async function getDocumentBoxPlacementsData(
+  documentId: string,
+): Promise<DocumentBoxPlacementsData> {
+  const { workspace } = await requireWorkspace();
+  const db = getDb();
+
+  const [document] = await db
+    .select(selectDocumentSummaryFields())
+    .from(documents)
+    .where(
+      and(
+        eq(documents.id, documentId),
+        eq(documents.workspaceId, workspace.id),
+        ne(documents.type, "box_home"),
+      ),
+    )
+    .limit(1);
+
+  if (!document) {
+    throw new Error("Document not found.");
+  }
+
+  const [allBoxes, placedBoxes] = await Promise.all([
+    db
+      .select(selectBoxSummaryFields())
+      .from(boxes)
+      .where(eq(boxes.workspaceId, workspace.id))
+      .orderBy(asc(boxes.name)),
+    db
+      .select(selectBoxSummaryFields())
+      .from(documentBoxes)
+      .innerJoin(
+        boxes,
+        and(eq(boxes.id, documentBoxes.boxId), eq(boxes.workspaceId, workspace.id)),
+      )
+      .where(
+        and(eq(documentBoxes.workspaceId, workspace.id), eq(documentBoxes.documentId, documentId)),
+      )
+      .orderBy(asc(boxes.name)),
+  ]);
+
+  return {
+    boxes: allBoxes,
+    placements: placedBoxes,
+    document: serializeDocumentSummary(document),
   };
 }

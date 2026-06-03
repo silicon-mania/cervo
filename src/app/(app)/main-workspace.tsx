@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { QueryProvider } from "@/components/providers/query-provider";
+import { AddToBoxPopover } from "@/features/boxes/components/add-to-box-popover";
 import { BoxesExplorer } from "@/features/boxes/components/boxes-explorer";
 import type { RootMemoryData } from "@/features/boxes/server/queries";
 import { TodayEditor } from "@/features/daily-notes/components/today-editor";
@@ -116,6 +117,10 @@ function MainWorkspaceContent({ initialDocument, initialMemoryData }: MainWorksp
       });
     };
   };
+  const canPlaceActiveDocument =
+    activeDocument.persistence === "persisted" &&
+    Boolean(activeDocument.id) &&
+    activeDocument.type !== "box_home";
 
   return (
     <>
@@ -127,6 +132,11 @@ function MainWorkspaceContent({ initialDocument, initialMemoryData }: MainWorksp
         initialContent={activeDocument.contentJson}
         initialContentText={activeDocument.contentText}
         expandable
+        actions={
+          canPlaceActiveDocument && activeDocument.id ? (
+            <AddToBoxPopover documentId={activeDocument.id} />
+          ) : null
+        }
         onDocumentPersisted={handleDocumentPersisted}
       />
 

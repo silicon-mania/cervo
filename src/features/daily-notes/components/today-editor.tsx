@@ -1,4 +1,5 @@
 import type { JSONContent } from "@tiptap/react";
+import type { ReactNode } from "react";
 
 import { DocumentAutosaveEditor } from "@/features/documents/components/document-autosave-editor";
 
@@ -9,6 +10,7 @@ type TodayEditorProps = {
   initialContent: JSONContent;
   initialContentText: string;
   expandable?: boolean;
+  actions?: ReactNode;
   onDocumentPersisted?: (documentId: string) => void;
 };
 
@@ -19,6 +21,7 @@ export function TodayEditor({
   initialContent,
   initialContentText,
   expandable = false,
+  actions,
   onDocumentPersisted,
 }: TodayEditorProps) {
   return (
@@ -31,6 +34,7 @@ export function TodayEditor({
       placeholder="Dump your mind..."
       autofocus
       expandable={expandable}
+      actions={actions}
       onDocumentPersisted={onDocumentPersisted}
     />
   );
