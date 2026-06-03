@@ -10,7 +10,7 @@ import {
   type BoxPlacementRequestInput,
   type CreateBoxInput,
 } from "../schemas";
-import type { BoxDocumentSummary, BoxSummary } from "./queries";
+import { getBoxSummaryForWorkspace, type BoxDocumentSummary, type BoxSummary } from "./queries";
 
 function slugify(value: string) {
   const slug = value
@@ -97,7 +97,7 @@ export async function createBox(input: CreateBoxInput): Promise<BoxSummary> {
     throw new Error("Unable to create box.");
   }
 
-  return box;
+  return getBoxSummaryForWorkspace(box.id, workspace.id);
 }
 
 type BoxPlacementMutationInput = BoxPlacementRequestInput & {
@@ -176,7 +176,7 @@ async function getPlacementMutationSubjects({
 
   return {
     document: serializeDocumentSummary(document),
-    box,
+    box: await getBoxSummaryForWorkspace(box.id, workspaceId),
   };
 }
 
@@ -205,7 +205,10 @@ export async function placeDocumentInBox(
       target: [documentBoxes.documentId, documentBoxes.boxId],
     });
 
-  return subjects;
+  return {
+    document: subjects.document,
+    box: await getBoxSummaryForWorkspace(payload.boxId, workspace.id),
+  };
 }
 
 export async function removeDocumentFromBox(
@@ -230,5 +233,8 @@ export async function removeDocumentFromBox(
       ),
     );
 
-  return subjects;
+  return {
+    document: subjects.document,
+    box: await getBoxSummaryForWorkspace(payload.boxId, workspace.id),
+  };
 }

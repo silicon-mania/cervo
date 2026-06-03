@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, FileText, LoaderCircle, Plus } from "lucide-react";
+import {
+  ArrowUp,
+  ChevronLeft,
+  ChevronRight,
+  FilePenLine,
+  FileText,
+  LoaderCircle,
+  Plus,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -104,7 +112,9 @@ function sortDocuments(documents: BoxDocumentSummary[]) {
 }
 
 function insertDocument(documents: BoxDocumentSummary[], document: BoxDocumentSummary) {
-  const withoutDuplicate = documents.filter((currentDocument) => currentDocument.id !== document.id);
+  const withoutDuplicate = documents.filter(
+    (currentDocument) => currentDocument.id !== document.id,
+  );
 
   return sortDocuments([...withoutDuplicate, document]);
 }
@@ -144,28 +154,34 @@ function NoteCard({
       onClick={() => onOpen?.(document.id)}
       disabled={!onOpen || isLoading}
       className={cn(
-        "flex min-h-36 flex-col justify-between rounded-md border bg-background p-4",
-        "text-left transition-colors hover:border-foreground/20 hover:bg-muted/20",
+        "min-w-0 text-left",
+        "group flex flex-col justify-between rounded-md border bg-background p-4",
+        "transition-colors hover:border-foreground/20 hover:bg-muted/20",
         "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
         "disabled:pointer-events-none disabled:opacity-70",
       )}>
-      <div className="flex items-start gap-3">
-        <div className="flex size-10 items-center justify-center rounded-md border bg-muted/30">
-          <FileText className="size-5 text-muted-foreground" />
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-1">
+          <div className="flex size-10 shrink-0 items-center justify-center">
+            <FileText className="size-6 text-muted-foreground group-hover:hidden" />
+            <FilePenLine className="hidden size-6 text-foreground group-hover:block" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate text-sm font-medium" title={document.title}>
+              {document.title}
+            </h3>
+            <p className="mt-1 truncate text-xs text-muted-foreground">...</p>
+          </div>
         </div>
-        <div className="min-w-0">
-          <h3 className="truncate text-sm font-medium">{document.title}</h3>
-          {document.date ? (
-            <p className="mt-1 font-mono text-xs text-muted-foreground">{document.date}</p>
-          ) : null}
-        </div>
+        {isLoading ? (
+          <LoaderCircle
+            className="size-4 shrink-0 animate-spin text-muted-foreground"
+            aria-hidden="true"
+          />
+        ) : (
+          <ArrowUp className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+        )}
       </div>
-      {isLoading ? (
-        <LoaderCircle
-          className="mt-4 size-4 animate-spin self-end text-muted-foreground"
-          aria-hidden="true"
-        />
-      ) : null}
     </button>
   );
 }
@@ -189,8 +205,7 @@ export function BoxesExplorer({
   });
 
   const activeBoxId = activeTarget.type === "box" ? activeTarget.boxId : null;
-  const isOptimisticBoxTarget =
-    activeTarget.type === "box" && Boolean(activeTarget.optimisticBox);
+  const isOptimisticBoxTarget = activeTarget.type === "box" && Boolean(activeTarget.optimisticBox);
   const boxMemoryQuery = useQuery({
     queryKey: activeBoxId ? boxMemoryQueryKey(activeBoxId) : ["memory", "box", "idle"],
     queryFn: () => fetchMemoryData<BoxMemoryData>(activeBoxId ?? undefined),
@@ -232,7 +247,12 @@ export function BoxesExplorer({
     }
 
     return [];
-  }, [activeTarget.type, boxMemory?.documents, isOptimisticBoxTarget, rootMemory.unsortedDocuments]);
+  }, [
+    activeTarget.type,
+    boxMemory?.documents,
+    isOptimisticBoxTarget,
+    rootMemory.unsortedDocuments,
+  ]);
 
   const createNoteMutation = useMutation<
     CreateNoteResponse,
@@ -324,6 +344,7 @@ export function BoxesExplorer({
             ),
           };
         });
+        void queryClient.invalidateQueries({ queryKey: ["memory"] });
         return;
       }
 
@@ -341,6 +362,7 @@ export function BoxesExplorer({
           ),
         };
       });
+      void queryClient.invalidateQueries({ queryKey: ["memory"] });
     },
     onError: (_error, _input, context) => {
       if (!context) {

@@ -77,12 +77,11 @@ function documentBoxPlacementsQueryKey(documentId: string) {
 }
 
 async function fetchDocumentBoxPlacements(documentId: string) {
-  const response = await fetch(
-    `/api/documents/${encodeURIComponent(documentId)}/box-placements`,
-  );
-  const payload = (await response.json().catch(() => null)) as
-    | { data?: DocumentBoxPlacementsData; error?: string }
-    | null;
+  const response = await fetch(`/api/documents/${encodeURIComponent(documentId)}/box-placements`);
+  const payload = (await response.json().catch(() => null)) as {
+    data?: DocumentBoxPlacementsData;
+    error?: string;
+  } | null;
 
   if (!response.ok || !payload?.data) {
     throw new Error(payload?.error ?? "Unable to load box placements.");
@@ -92,14 +91,11 @@ async function fetchDocumentBoxPlacements(documentId: string) {
 }
 
 async function mutatePlacement(documentId: string, input: PlacementMutationInput) {
-  const response = await fetch(
-    `/api/documents/${encodeURIComponent(documentId)}/box-placements`,
-    {
-      method: input.action === "add" ? "POST" : "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ boxId: input.boxId }),
-    },
-  );
+  const response = await fetch(`/api/documents/${encodeURIComponent(documentId)}/box-placements`, {
+    method: input.action === "add" ? "POST" : "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ boxId: input.boxId }),
+  });
   const payload = (await response.json().catch(() => null)) as PlacementMutationResponse | null;
 
   if (!response.ok || !payload || payload.error) {
@@ -248,8 +244,7 @@ export function AddToBoxPopover({ documentId }: AddToBoxPopoverProps) {
         queryClient.cancelQueries({ queryKey: boxMemoryQueryKey(input.boxId) }),
       ]);
 
-      const previousPlacementData =
-        queryClient.getQueryData<DocumentBoxPlacementsData>(queryKey);
+      const previousPlacementData = queryClient.getQueryData<DocumentBoxPlacementsData>(queryKey);
       const previousRootMemory = queryClient.getQueryData<RootMemoryData>(rootMemoryQueryKey);
       const previousBoxMemory = queryClient.getQueryData<BoxMemoryData>(
         boxMemoryQueryKey(input.boxId),
@@ -387,6 +382,8 @@ export function AddToBoxPopover({ documentId }: AddToBoxPopoverProps) {
           };
         });
       }
+
+      void queryClient.invalidateQueries({ queryKey: ["memory"] });
     },
     onError: (error, _input, context) => {
       if (context?.previousPlacementData) {
@@ -422,8 +419,7 @@ export function AddToBoxPopover({ documentId }: AddToBoxPopoverProps) {
         ...(parentBoxQueryKey ? [queryClient.cancelQueries({ queryKey: parentBoxQueryKey })] : []),
       ]);
 
-      const previousPlacementData =
-        queryClient.getQueryData<DocumentBoxPlacementsData>(queryKey);
+      const previousPlacementData = queryClient.getQueryData<DocumentBoxPlacementsData>(queryKey);
       const previousRootMemory = queryClient.getQueryData<RootMemoryData>(rootMemoryQueryKey);
       const previousParentBoxMemory = parentBoxQueryKey
         ? queryClient.getQueryData<BoxMemoryData>(parentBoxQueryKey)
@@ -436,6 +432,8 @@ export function AddToBoxPopover({ documentId }: AddToBoxPopoverProps) {
         status: "active",
         parentBoxId: input.parentBoxId,
         homeDocumentId: null,
+        directNoteCount: 0,
+        directBoxCount: 0,
       };
 
       queryClient.setQueryData<DocumentBoxPlacementsData>(queryKey, (currentData) => {
@@ -533,6 +531,7 @@ export function AddToBoxPopover({ documentId }: AddToBoxPopoverProps) {
               : currentData.unsortedDocuments,
           };
         });
+        void queryClient.invalidateQueries({ queryKey: ["memory"] });
         return;
       }
 
@@ -545,11 +544,7 @@ export function AddToBoxPopover({ documentId }: AddToBoxPopoverProps) {
 
           return {
             ...currentData,
-            childBoxes: replaceBox(
-              currentData.childBoxes,
-              context.optimisticBox.id,
-              placement.box,
-            ),
+            childBoxes: replaceBox(currentData.childBoxes, context.optimisticBox.id, placement.box),
           };
         },
       );
@@ -566,6 +561,8 @@ export function AddToBoxPopover({ documentId }: AddToBoxPopoverProps) {
           };
         });
       }
+
+      void queryClient.invalidateQueries({ queryKey: ["memory"] });
     },
     onError: (error, _input, context) => {
       if (context?.previousPlacementData) {
@@ -628,9 +625,7 @@ export function AddToBoxPopover({ documentId }: AddToBoxPopoverProps) {
       .sort((a, b) => a.path.join(" / ").localeCompare(b.path.join(" / ")));
   }, [data?.boxes]);
   const validNewBoxParentId =
-    newBoxParentId && data?.boxes.some((box) => box.id === newBoxParentId)
-      ? newBoxParentId
-      : null;
+    newBoxParentId && data?.boxes.some((box) => box.id === newBoxParentId) ? newBoxParentId : null;
   const selectedParentPath = useMemo(() => {
     const selectedParent = validNewBoxParentId
       ? boxes.find(({ box }) => box.id === validNewBoxParentId)

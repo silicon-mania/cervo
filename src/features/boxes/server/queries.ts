@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, ne } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull, ne, notInArray } from "drizzle-orm";
 
 import { requireWorkspace } from "@/server/auth/require-workspace";
 import { getDb } from "@/server/db/client";
@@ -11,7 +11,11 @@ export type BoxSummary = {
   status: "active" | "future" | "archived";
   parentBoxId: string | null;
   homeDocumentId: string | null;
+  directNoteCount: number;
+  directBoxCount: number;
 };
+
+type BoxSummaryFields = Omit<BoxSummary, "directNoteCount" | "directBoxCount">;
 
 export type BoxDocumentSummary = {
   id: string;
@@ -48,6 +52,88 @@ function selectBoxSummaryFields() {
     parentBoxId: boxes.parentBoxId,
     homeDocumentId: boxes.homeDocumentId,
   };
+}
+
+async function attachDirectCounts(
+  boxSummaries: BoxSummaryFields[],
+  workspaceId: string,
+): Promise<BoxSummary[]> {
+  if (boxSummaries.length === 0) {
+    return [];
+  }
+
+  const db = getDb();
+  const boxIds = boxSummaries.map((box) => box.id);
+  const homeDocumentIds = getWorkspaceHomeDocumentIds(workspaceId);
+  const noteFilters = [
+    eq(documentBoxes.workspaceId, workspaceId),
+    inArray(documentBoxes.boxId, boxIds),
+    ne(documents.type, "box_home"),
+  ];
+  const homeDocumentIdList = Array.from(await homeDocumentIds);
+
+  if (homeDocumentIdList.length > 0) {
+    noteFilters.push(notInArray(documents.id, homeDocumentIdList));
+  }
+
+  const [noteCounts, boxCounts] = await Promise.all([
+    db
+      .select({
+        boxId: documentBoxes.boxId,
+        directNoteCount: count(),
+      })
+      .from(documentBoxes)
+      .innerJoin(
+        documents,
+        and(eq(documents.id, documentBoxes.documentId), eq(documents.workspaceId, workspaceId)),
+      )
+      .where(and(...noteFilters))
+      .groupBy(documentBoxes.boxId),
+    db
+      .select({
+        parentBoxId: boxes.parentBoxId,
+        directBoxCount: count(),
+      })
+      .from(boxes)
+      .where(and(eq(boxes.workspaceId, workspaceId), inArray(boxes.parentBoxId, boxIds)))
+      .groupBy(boxes.parentBoxId),
+  ]);
+
+  const noteCountByBoxId = new Map(
+    noteCounts.map((row) => [row.boxId, Number(row.directNoteCount)]),
+  );
+  const boxCountByBoxId = new Map(
+    boxCounts.flatMap((row) =>
+      row.parentBoxId ? [[row.parentBoxId, Number(row.directBoxCount)] as const] : [],
+    ),
+  );
+
+  return boxSummaries.map((box) => ({
+    ...box,
+    directNoteCount: noteCountByBoxId.get(box.id) ?? 0,
+    directBoxCount: boxCountByBoxId.get(box.id) ?? 0,
+  }));
+}
+
+export async function getBoxSummaryForWorkspace(boxId: string, workspaceId: string) {
+  const db = getDb();
+  const [box] = await db
+    .select(selectBoxSummaryFields())
+    .from(boxes)
+    .where(and(eq(boxes.workspaceId, workspaceId), eq(boxes.id, boxId)))
+    .limit(1);
+
+  if (!box) {
+    throw new Error("Box not found.");
+  }
+
+  const [boxSummary] = await attachDirectCounts([box], workspaceId);
+
+  if (!boxSummary) {
+    throw new Error("Box not found.");
+  }
+
+  return boxSummary;
 }
 
 function selectDocumentSummaryFields() {
@@ -124,7 +210,7 @@ export async function getRootMemoryData(): Promise<RootMemoryData> {
   ]);
 
   return {
-    boxes: rootBoxes,
+    boxes: await attachDirectCounts(rootBoxes, workspace.id),
     unsortedDocuments: excludeBoxHomeDocumentIds(unsortedDocuments, homeDocumentIds),
   };
 }
@@ -167,11 +253,12 @@ export async function getBoxMemoryData(boxId: string): Promise<BoxMemoryData> {
     getWorkspaceHomeDocumentIds(workspace.id),
   ]);
 
-  const path: BoxSummary[] = [];
-  let currentBox: BoxSummary | undefined = box;
+  const [boxSummary] = await attachDirectCounts([box], workspace.id);
+  const pathRows: BoxSummaryFields[] = [];
+  let currentBox: BoxSummaryFields | undefined = box;
 
   for (let depth = 0; currentBox && depth < 12; depth += 1) {
-    path.unshift(currentBox);
+    pathRows.unshift(currentBox);
 
     if (!currentBox.parentBoxId) {
       break;
@@ -187,9 +274,9 @@ export async function getBoxMemoryData(boxId: string): Promise<BoxMemoryData> {
   }
 
   return {
-    box,
-    path,
-    childBoxes,
+    box: boxSummary,
+    path: await attachDirectCounts(pathRows, workspace.id),
+    childBoxes: await attachDirectCounts(childBoxes, workspace.id),
     documents: excludeBoxHomeDocumentIds(linkedDocuments, homeDocumentIds),
   };
 }
@@ -225,10 +312,7 @@ export async function getDocumentBoxPlacementsData(
     db
       .select(selectBoxSummaryFields())
       .from(documentBoxes)
-      .innerJoin(
-        boxes,
-        and(eq(boxes.id, documentBoxes.boxId), eq(boxes.workspaceId, workspace.id)),
-      )
+      .innerJoin(boxes, and(eq(boxes.id, documentBoxes.boxId), eq(boxes.workspaceId, workspace.id)))
       .where(
         and(eq(documentBoxes.workspaceId, workspace.id), eq(documentBoxes.documentId, documentId)),
       )
@@ -236,8 +320,8 @@ export async function getDocumentBoxPlacementsData(
   ]);
 
   return {
-    boxes: allBoxes,
-    placements: placedBoxes,
+    boxes: await attachDirectCounts(allBoxes, workspace.id),
+    placements: await attachDirectCounts(placedBoxes, workspace.id),
     document: serializeDocumentSummary(document),
   };
 }

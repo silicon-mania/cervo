@@ -8,11 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-import type {
-  BoxMemoryData,
-  BoxSummary,
-  RootMemoryData,
-} from "@/features/boxes/server/queries";
+import type { BoxMemoryData, BoxSummary, RootMemoryData } from "@/features/boxes/server/queries";
 
 type CreateBoxFormProps = {
   parentBoxId?: string;
@@ -99,6 +95,8 @@ export function CreateBoxForm({
         status: "active",
         parentBoxId: input.parentBoxId,
         homeDocumentId: null,
+        directNoteCount: 0,
+        directBoxCount: 0,
       };
 
       if (!input.parentBoxId) {
@@ -150,6 +148,7 @@ export function CreateBoxForm({
             ),
           };
         });
+        void queryClient.invalidateQueries({ queryKey: ["memory"] });
         onCreated?.(box);
         return;
       }
@@ -171,6 +170,7 @@ export function CreateBoxForm({
           };
         },
       );
+      void queryClient.invalidateQueries({ queryKey: ["memory"] });
       onCreated?.(box);
     },
     onError: (error, _input, context) => {
