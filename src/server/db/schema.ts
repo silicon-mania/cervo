@@ -13,11 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
-export const documentType = pgEnum("document_type", [
-  "daily_note",
-  "box_home",
-  "note",
-]);
+export const documentType = pgEnum("document_type", ["daily_note", "box_home", "note"]);
 export const boxStatus = pgEnum("box_status", ["active", "future", "archived"]);
 export const taskStatus = pgEnum("task_status", ["todo", "done"]);
 export const attachmentSourceType = pgEnum("attachment_source_type", [
@@ -30,12 +26,8 @@ export const inboxSource = pgEnum("inbox_source", ["mock", "gmail"]);
 export const eventSource = pgEnum("event_source", ["mock", "google_calendar"]);
 
 const timestamps = {
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 };
 
 export const workspaces = pgTable(
@@ -49,9 +41,7 @@ export const workspaces = pgTable(
     ...timestamps,
   },
   (table) => ({
-    clerkOrgIdIdx: uniqueIndex("workspaces_clerk_org_id_idx").on(
-      table.clerkOrgId,
-    ),
+    clerkOrgIdIdx: uniqueIndex("workspaces_clerk_org_id_idx").on(table.clerkOrgId),
   }),
 );
 
@@ -84,24 +74,17 @@ export const boxes = pgTable(
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     status: boxStatus("status").notNull().default("active"),
-    parentBoxId: uuid("parent_box_id").references(
-      (): AnyPgColumn => boxes.id,
-      { onDelete: "set null" },
-    ),
+    parentBoxId: uuid("parent_box_id").references((): AnyPgColumn => boxes.id, {
+      onDelete: "set null",
+    }),
     homeDocumentId: uuid("home_document_id").references(() => documents.id, {
       onDelete: "set null",
     }),
     ...timestamps,
   },
   (table) => ({
-    workspaceSlugIdx: uniqueIndex("boxes_workspace_slug_idx").on(
-      table.workspaceId,
-      table.slug,
-    ),
-    workspaceStatusIdx: index("boxes_workspace_status_idx").on(
-      table.workspaceId,
-      table.status,
-    ),
+    workspaceSlugIdx: uniqueIndex("boxes_workspace_slug_idx").on(table.workspaceId, table.slug),
+    workspaceStatusIdx: index("boxes_workspace_status_idx").on(table.workspaceId, table.status),
     workspaceParentIdx: index("boxes_workspace_parent_idx").on(
       table.workspaceId,
       table.parentBoxId,
@@ -130,19 +113,11 @@ export const documents = pgTable(
       "documents_daily_note_date_required_chk",
       sql`${table.type} <> 'daily_note' OR ${table.date} IS NOT NULL`,
     ),
-    dailyNoteWorkspaceDateIdx: uniqueIndex(
-      "documents_daily_note_workspace_date_idx",
-    )
+    dailyNoteWorkspaceDateIdx: uniqueIndex("documents_daily_note_workspace_date_idx")
       .on(table.workspaceId, table.date)
       .where(sql`${table.type} = 'daily_note'`),
-    workspaceTypeIdx: index("documents_workspace_type_idx").on(
-      table.workspaceId,
-      table.type,
-    ),
-    workspaceDateIdx: index("documents_workspace_date_idx").on(
-      table.workspaceId,
-      table.date,
-    ),
+    workspaceTypeIdx: index("documents_workspace_type_idx").on(table.workspaceId, table.type),
+    workspaceDateIdx: index("documents_workspace_date_idx").on(table.workspaceId, table.date),
   }),
 );
 
@@ -160,19 +135,14 @@ export const documentBoxes = pgTable(
       .notNull()
       .references(() => boxes.id, { onDelete: "cascade" }),
     createdBy: text("created_by").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
     documentBoxIdx: uniqueIndex("document_boxes_document_box_idx").on(
       table.documentId,
       table.boxId,
     ),
-    workspaceBoxIdx: index("document_boxes_workspace_box_idx").on(
-      table.workspaceId,
-      table.boxId,
-    ),
+    workspaceBoxIdx: index("document_boxes_workspace_box_idx").on(table.workspaceId, table.boxId),
     workspaceDocumentIdx: index("document_boxes_workspace_document_idx").on(
       table.workspaceId,
       table.documentId,
@@ -187,12 +157,9 @@ export const tasks = pgTable(
     workspaceId: uuid("workspace_id")
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
-    sourceDocumentId: uuid("source_document_id").references(
-      () => documents.id,
-      {
-        onDelete: "set null",
-      },
-    ),
+    sourceDocumentId: uuid("source_document_id").references(() => documents.id, {
+      onDelete: "set null",
+    }),
     boxId: uuid("box_id").references(() => boxes.id, { onDelete: "set null" }),
     title: text("title").notNull(),
     status: taskStatus("status").notNull().default("todo"),
@@ -200,10 +167,7 @@ export const tasks = pgTable(
     ...timestamps,
   },
   (table) => ({
-    workspaceStatusIdx: index("tasks_workspace_status_idx").on(
-      table.workspaceId,
-      table.status,
-    ),
+    workspaceStatusIdx: index("tasks_workspace_status_idx").on(table.workspaceId, table.status),
   }),
 );
 
@@ -224,10 +188,7 @@ export const people = pgTable(
     ...timestamps,
   },
   (table) => ({
-    workspaceNameIdx: index("people_workspace_name_idx").on(
-      table.workspaceId,
-      table.name,
-    ),
+    workspaceNameIdx: index("people_workspace_name_idx").on(table.workspaceId, table.name),
   }),
 );
 

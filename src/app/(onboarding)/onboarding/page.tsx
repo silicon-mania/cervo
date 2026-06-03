@@ -23,12 +23,10 @@ export default async function OnboardingPage() {
           <Building2 className="size-5" aria-hidden="true" />
         </div>
         <div className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-normal">
-            Choose your workspace
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-normal">Choose your workspace</h1>
           <p className="text-sm leading-6 text-muted-foreground">
-            Create a workspace or accept an invitation. Existing workspaces are
-            invite-only and never shown in a public directory.
+            Create a workspace or accept an invitation. Existing workspaces are invite-only and
+            never shown in a public directory.
           </p>
         </div>
         <div className="rounded-md border bg-background p-4">
@@ -43,10 +41,7 @@ export default async function OnboardingPage() {
         <Separator />
         <div className="flex gap-3 text-sm leading-6 text-muted-foreground">
           <MailPlus className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <p>
-            To join an existing workspace, use the invitation email sent by one
-            of its members.
-          </p>
+          <p>To join an existing workspace, use the invitation email sent by one of its members.</p>
         </div>
       </section>
     </main>

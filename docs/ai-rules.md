@@ -146,8 +146,8 @@ The product is an Obsidian-like company second brain. The MVP must prove fast ca
 - If a dependency is added, document why it is needed.
 - Avoid dependencies that duplicate TipTap, shadcn/Radix, Drizzle, Clerk, Supabase, or AI SDK responsibilities.
 - Do not use obscure install workarounds to force a package manager through errors.
-- If pnpm creates repeated installation friction, stop and ask whether to switch the project to npm.
-- Do not mix pnpm and npm lockfiles.
+- Use npm for dependency management.
+- Do not add alternative package-manager lockfiles.
 
 ## Before finishing a task
 

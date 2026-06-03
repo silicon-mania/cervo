@@ -8,10 +8,7 @@ import { DocumentEditor, type DocumentEditorValue } from "@/components/editor";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-import {
-  type DocumentAutosaveValue,
-  useDocumentAutosave,
-} from "../hooks/use-document-autosave";
+import { type DocumentAutosaveValue, useDocumentAutosave } from "../hooks/use-document-autosave";
 
 type DocumentAutosaveEditorProps = {
   documentId?: string | null;
@@ -60,8 +57,7 @@ function AutosaveStatus({
       className={cn(
         "inline-flex items-center gap-2 text-sm text-muted-foreground",
         "transition-opacity",
-      )}
-    >
+      )}>
       <Check className="h-3.5 w-3.5 opacity-50" />
       <span className="opacity-70">Saved</span>
     </div>
@@ -124,8 +120,7 @@ export function DocumentAutosaveEditor({
         isDefaultConstrained && "h-[calc((100svh-3.5rem)*0.72)] min-h-[440px]",
         isExpanded && "min-h-[calc(100svh-3.5rem)]",
         sectionClassName,
-      )}
-    >
+      )}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <input
@@ -147,8 +142,7 @@ export function DocumentAutosaveEditor({
               variant="ghost"
               size="icon-sm"
               aria-label={isExpanded ? "Collapse note" : "Expand note"}
-              onClick={() => setIsExpanded((current) => !current)}
-            >
+              onClick={() => setIsExpanded((current) => !current)}>
               {isExpanded ? (
                 <Minimize2 className="size-4" aria-hidden="true" />
               ) : (

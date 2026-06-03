@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from "next/link";
 import {
   Brain,
   CalendarDays,
@@ -7,26 +7,18 @@ import {
   Search,
   Settings,
   type LucideIcon,
-} from 'lucide-react';
+} from "lucide-react";
 
-import { Panel, PanelHeader } from '@/components/primitives/panel';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Panel, PanelHeader } from "@/components/primitives/panel";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const navItems = [
-  { href: '/', label: 'Main', icon: Brain },
-  { href: '/tasks', label: 'Tasks', icon: CheckSquare },
+  { href: "/", label: "Main", icon: Brain },
+  { href: "/tasks", label: "Tasks", icon: CheckSquare },
 ];
 
-function RailLink({
-  href,
-  label,
-  icon: Icon,
-}: {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-}) {
+function RailLink({ href, label, icon: Icon }: { href: string; label: string; icon: LucideIcon }) {
   return (
     <div className="group relative">
       <div>
@@ -34,8 +26,7 @@ function RailLink({
           asChild
           variant="ghost"
           size="icon"
-          className="text-muted-foreground hover:text-foreground"
-        >
+          className="text-muted-foreground hover:text-foreground">
           <Link href={href} aria-label={label}>
             <Icon className="size-4" aria-hidden="true" />
           </Link>
@@ -43,8 +34,7 @@ function RailLink({
       </div>
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute left-11 top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs text-background opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
-      >
+        className="pointer-events-none absolute left-11 top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs text-background opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
         {label}
       </span>
     </div>

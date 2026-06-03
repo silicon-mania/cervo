@@ -10,9 +10,7 @@ export function Panel({
   children: React.ReactNode;
 }>) {
   return (
-    <section className={cn("rounded-md border bg-background p-4", className)}>
-      {children}
-    </section>
+    <section className={cn("rounded-md border bg-background p-4", className)}>{children}</section>
   );
 }
 
@@ -25,9 +23,7 @@ export function PanelHeader({
 }>) {
   return (
     <div className="mb-3 flex items-center gap-2">
-      {Icon ? (
-        <Icon className="size-4 text-muted-foreground" aria-hidden="true" />
-      ) : null}
+      {Icon ? <Icon className="size-4 text-muted-foreground" aria-hidden="true" /> : null}
       <h2 className="text-sm font-medium">{title}</h2>
     </div>
   );

@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { EditorContent, type JSONContent, useEditor } from '@tiptap/react';
+import { EditorContent, type JSONContent, useEditor } from "@tiptap/react";
 
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
 
-import { getDocumentEditorExtensions } from './extensions';
+import { getDocumentEditorExtensions } from "./extensions";
 
 export type DocumentEditorValue = {
   contentJson: JSONContent;
@@ -22,7 +22,7 @@ type DocumentEditorProps = {
 };
 
 const emptyDocumentContent: JSONContent = {
-  type: 'doc',
+  type: "doc",
   content: [],
 };
 
@@ -44,11 +44,11 @@ export function DocumentEditor({
     editorProps: {
       attributes: {
         class: cn(
-          'min-h-[560px] w-full px-1 py-1 text-[15px] leading-7 outline-none',
-          'text-foreground caret-foreground',
-          editorClassName
+          "min-h-[560px] w-full px-1 py-1 text-[15px] leading-7 outline-none",
+          "text-foreground caret-foreground",
+          editorClassName,
         ),
-        'aria-label': 'Document editor',
+        "aria-label": "Document editor",
       },
     },
     onUpdate({ editor }) {
@@ -62,11 +62,10 @@ export function DocumentEditor({
   return (
     <div
       className={cn(
-        'cervo-document-editor min-h-[560px] rounded-md',
-        'focus-within:outline-none',
-        className
-      )}
-    >
+        "cervo-document-editor min-h-[560px] rounded-md",
+        "focus-within:outline-none",
+        className,
+      )}>
       <EditorContent editor={editor} />
     </div>
   );

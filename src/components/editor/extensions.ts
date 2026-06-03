@@ -15,9 +15,7 @@ const CervoTaskItem = TaskItem.extend({
   },
 });
 
-export function getDocumentEditorExtensions({
-  placeholder,
-}: DocumentEditorExtensionsOptions = {}) {
+export function getDocumentEditorExtensions({ placeholder }: DocumentEditorExtensionsOptions = {}) {
   return [
     StarterKit.configure({
       heading: false,

@@ -90,12 +90,8 @@
           "name": "ai_actions_workspace_id_workspaces_id_fk",
           "tableFrom": "ai_actions",
           "tableTo": "workspaces",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -209,12 +205,8 @@
           "name": "attachments_workspace_id_workspaces_id_fk",
           "tableFrom": "attachments",
           "tableTo": "workspaces",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -359,12 +351,8 @@
           "name": "boxes_workspace_id_workspaces_id_fk",
           "tableFrom": "boxes",
           "tableTo": "workspaces",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -372,12 +360,8 @@
           "name": "boxes_parent_box_id_boxes_id_fk",
           "tableFrom": "boxes",
           "tableTo": "boxes",
-          "columnsFrom": [
-            "parent_box_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["parent_box_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -385,12 +369,8 @@
           "name": "boxes_home_document_id_documents_id_fk",
           "tableFrom": "boxes",
           "tableTo": "documents",
-          "columnsFrom": [
-            "home_document_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["home_document_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -514,12 +494,8 @@
           "name": "document_boxes_workspace_id_workspaces_id_fk",
           "tableFrom": "document_boxes",
           "tableTo": "workspaces",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -527,12 +503,8 @@
           "name": "document_boxes_document_id_documents_id_fk",
           "tableFrom": "document_boxes",
           "tableTo": "documents",
-          "columnsFrom": [
-            "document_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["document_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -540,12 +512,8 @@
           "name": "document_boxes_box_id_boxes_id_fk",
           "tableFrom": "document_boxes",
           "tableTo": "boxes",
-          "columnsFrom": [
-            "box_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["box_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -704,12 +672,8 @@
           "name": "documents_workspace_id_workspaces_id_fk",
           "tableFrom": "documents",
           "tableTo": "workspaces",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -811,12 +775,8 @@
           "name": "events_workspace_id_workspaces_id_fk",
           "tableFrom": "events",
           "tableTo": "workspaces",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -926,12 +886,8 @@
           "name": "inbox_items_workspace_id_workspaces_id_fk",
           "tableFrom": "inbox_items",
           "tableTo": "workspaces",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1045,12 +1001,8 @@
           "name": "people_workspace_id_workspaces_id_fk",
           "tableFrom": "people",
           "tableTo": "workspaces",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1153,12 +1105,8 @@
           "name": "tasks_workspace_id_workspaces_id_fk",
           "tableFrom": "tasks",
           "tableTo": "workspaces",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1166,12 +1114,8 @@
           "name": "tasks_source_document_id_documents_id_fk",
           "tableFrom": "tasks",
           "tableTo": "documents",
-          "columnsFrom": [
-            "source_document_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_document_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1179,12 +1123,8 @@
           "name": "tasks_box_id_boxes_id_fk",
           "tableFrom": "tasks",
           "tableTo": "boxes",
-          "columnsFrom": [
-            "box_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["box_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1268,12 +1208,8 @@
           "name": "workspace_members_workspace_id_workspaces_id_fk",
           "tableFrom": "workspace_members",
           "tableTo": "workspaces",
-          "columnsFrom": [
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["workspace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1363,54 +1299,32 @@
     "public.attachment_source_type": {
       "name": "attachment_source_type",
       "schema": "public",
-      "values": [
-        "document",
-        "box",
-        "task",
-        "person"
-      ]
+      "values": ["document", "box", "task", "person"]
     },
     "public.box_status": {
       "name": "box_status",
       "schema": "public",
-      "values": [
-        "active",
-        "future",
-        "archived"
-      ]
+      "values": ["active", "future", "archived"]
     },
     "public.document_type": {
       "name": "document_type",
       "schema": "public",
-      "values": [
-        "daily_note",
-        "box_home",
-        "note"
-      ]
+      "values": ["daily_note", "box_home", "note"]
     },
     "public.event_source": {
       "name": "event_source",
       "schema": "public",
-      "values": [
-        "mock",
-        "google_calendar"
-      ]
+      "values": ["mock", "google_calendar"]
     },
     "public.inbox_source": {
       "name": "inbox_source",
       "schema": "public",
-      "values": [
-        "mock",
-        "gmail"
-      ]
+      "values": ["mock", "gmail"]
     },
     "public.task_status": {
       "name": "task_status",
       "schema": "public",
-      "values": [
-        "todo",
-        "done"
-      ]
+      "values": ["todo", "done"]
     }
   },
   "schemas": {},

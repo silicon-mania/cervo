@@ -8,10 +8,7 @@ import {
 import { autosaveDailyDocument } from "@/features/documents/server/mutations";
 import { requireWorkspace } from "@/server/auth/require-workspace";
 
-export async function PUT(
-  request: Request,
-  context: { params: Promise<{ date: string }> },
-) {
+export async function PUT(request: Request, context: { params: Promise<{ date: string }> }) {
   try {
     const { clerkUserId, workspace } = await requireWorkspace();
     const params = dailyNoteAutosaveParamsSchema.parse(await context.params);
@@ -25,10 +22,7 @@ export async function PUT(
     });
 
     if (!document) {
-      return NextResponse.json(
-        { error: "Unable to save daily note." },
-        { status: 500 },
-      );
+      return NextResponse.json({ error: "Unable to save daily note." }, { status: 500 });
     }
 
     return NextResponse.json({ document });
@@ -39,18 +33,14 @@ export async function PUT(
 
     if (error instanceof Error) {
       const status =
-        error.message === "Authentication required." ||
-        error.message === "Organization required."
+        error.message === "Authentication required." || error.message === "Organization required."
           ? 401
           : 500;
 
       return NextResponse.json({ error: error.message }, { status });
     }
 
-    return NextResponse.json(
-      { error: "Unable to autosave daily note." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Unable to autosave daily note." }, { status: 500 });
   }
 }
 

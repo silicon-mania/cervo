@@ -1,46 +1,24 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { getDb } from "@/server/db/client";
 import { documents } from "@/server/db/schema";
 import { requireWorkspace } from "@/server/auth/require-workspace";
 import type { JSONContent } from "@tiptap/react";
 
-import {
-  getAppTimeZone,
-  getDailyNoteTitle,
-  getDateKeyInTimeZone,
-} from "./date";
+import { getAppTimeZone, getDailyNoteTitle, getDateKeyInTimeZone } from "./date";
 
 const emptyDocumentContent = {
   type: "doc",
   content: [],
 };
 
-export type DailyNote = {
+type DailyNote = {
   id: string;
   title: string;
   date: string;
   contentJson: JSONContent;
   contentText: string;
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy: string;
-  updatedBy: string;
 };
-
-export type TodayDocumentForEditor =
-  | (DailyNote & {
-      persistence: "persisted";
-    })
-  | {
-      id: null;
-      persistence: "virtual_daily";
-      title: string;
-      type: "daily_note";
-      date: string;
-      contentJson: JSONContent;
-      contentText: string;
-    };
 
 function selectDailyNoteFields() {
   return {
@@ -49,10 +27,6 @@ function selectDailyNoteFields() {
     date: documents.date,
     contentJson: documents.contentJson,
     contentText: documents.contentText,
-    createdAt: documents.createdAt,
-    updatedAt: documents.updatedAt,
-    createdBy: documents.createdBy,
-    updatedBy: documents.updatedBy,
   };
 }
 
@@ -70,72 +44,6 @@ function assertDailyNoteDate(
     ...document,
     date: document.date,
     contentJson: document.contentJson as JSONContent,
-  };
-}
-
-export async function getOrCreateTodayDocument() {
-  const { clerkUserId, workspace } = await requireWorkspace();
-  const db = getDb();
-  const timeZone = getAppTimeZone();
-  const todayDate = getDateKeyInTimeZone({ timeZone });
-
-  const [existingDocument] = await db
-    .select(selectDailyNoteFields())
-    .from(documents)
-    .where(
-      and(
-        eq(documents.workspaceId, workspace.id),
-        eq(documents.type, "daily_note"),
-        eq(documents.date, todayDate),
-      ),
-    )
-    .limit(1);
-
-  if (existingDocument) {
-    return {
-      date: todayDate,
-      document: assertDailyNoteDate(existingDocument),
-      timeZone,
-      workspace,
-    };
-  }
-
-  const now = new Date();
-  const title = getDailyNoteTitle(todayDate);
-
-  const [document] = await db
-    .insert(documents)
-    .values({
-      workspaceId: workspace.id,
-      type: "daily_note",
-      date: todayDate,
-      title,
-      contentJson: emptyDocumentContent,
-      contentText: "",
-      createdBy: clerkUserId,
-      updatedBy: clerkUserId,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: [documents.workspaceId, documents.date],
-      targetWhere: sql`${documents.type} = 'daily_note'`,
-      set: {
-        updatedBy: clerkUserId,
-        updatedAt: now,
-      },
-    })
-    .returning(selectDailyNoteFields());
-
-  if (!document) {
-    throw new Error("Unable to create today's daily note.");
-  }
-
-  return {
-    date: todayDate,
-    document: assertDailyNoteDate(document),
-    timeZone,
-    workspace,
   };
 }
 

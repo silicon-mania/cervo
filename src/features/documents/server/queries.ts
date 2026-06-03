@@ -43,9 +43,7 @@ export async function getDocumentForEditor(documentId: string) {
   const [document] = await db
     .select(selectDocumentForEditorFields())
     .from(documents)
-    .where(
-      and(eq(documents.id, documentId), eq(documents.workspaceId, workspace.id)),
-    )
+    .where(and(eq(documents.id, documentId), eq(documents.workspaceId, workspace.id)))
     .limit(1);
 
   return document ? assertDocumentForEditor(document) : null;

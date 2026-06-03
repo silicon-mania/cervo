@@ -1,4 +1,1 @@
-export {
-  DocumentEditor,
-  type DocumentEditorValue,
-} from "./document-editor";
+export { DocumentEditor, type DocumentEditorValue } from "./document-editor";

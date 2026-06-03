@@ -1,9 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 
-import {
-  ensureWorkspaceMirror,
-  type WorkspaceContext,
-} from "@/server/workspaces/ensure-workspace";
+import { ensureWorkspaceMirror, type WorkspaceContext } from "@/server/workspaces/ensure-workspace";
 
 export type WorkspaceAuthContext = {
   clerkUserId: string;

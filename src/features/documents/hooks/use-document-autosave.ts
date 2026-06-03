@@ -88,16 +88,14 @@ export function useDocumentAutosave({
         });
 
         if (!response.ok) {
-          const payload = (await response.json().catch(() => null)) as
-            | { error?: string }
-            | null;
+          const payload = (await response.json().catch(() => null)) as { error?: string } | null;
 
           throw new Error(payload?.error ?? "Couldn’t save changes.");
         }
 
-        const payload = (await response.json().catch(() => null)) as
-          | { document?: { id?: string } }
-          | null;
+        const payload = (await response.json().catch(() => null)) as {
+          document?: { id?: string };
+        } | null;
         const persistedDocumentId = payload?.document?.id;
 
         if (!persistedDocumentIdRef.current && persistedDocumentId) {
@@ -112,9 +110,7 @@ export function useDocumentAutosave({
         setStatus(latestDraftRevisionRef.current > revision ? "idle" : "saved");
       } catch (error) {
         setStatus("error");
-        setErrorMessage(
-          error instanceof Error ? error.message : "Couldn’t save changes.",
-        );
+        setErrorMessage(error instanceof Error ? error.message : "Couldn’t save changes.");
       } finally {
         setIsSaving(false);
       }
@@ -189,11 +185,7 @@ export function useDocumentAutosave({
       return;
     }
 
-    if (
-      draftRevision === savedRevision ||
-      draftRevision === attemptedRevision ||
-      isSaving
-    ) {
+    if (draftRevision === savedRevision || draftRevision === attemptedRevision || isSaving) {
       return;
     }
 
@@ -204,14 +196,7 @@ export function useDocumentAutosave({
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [
-    attemptedRevision,
-    draft,
-    draftRevision,
-    isSaving,
-    saveDraft,
-    savedRevision,
-  ]);
+  }, [attemptedRevision, draft, draftRevision, isSaving, saveDraft, savedRevision]);
 
   return useMemo(
     () => ({

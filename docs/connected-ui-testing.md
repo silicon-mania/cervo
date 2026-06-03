@@ -45,7 +45,7 @@ Do not create automated test files unless explicitly requested. This document is
 1. Start the app locally:
 
    ```bash
-   pnpm dev
+   npm run dev
    ```
 
 2. Open `http://localhost:3000`.
@@ -65,7 +65,6 @@ Do not create automated test files unless explicitly requested. This document is
 7. Test the feature workflow from the app shell.
 
 8. For UI work, inspect the affected screen in the browser and check at least:
-
    - Page renders without runtime errors.
    - Main interactive controls are visible and clickable.
    - Loading, empty, error, disabled, and success states are present when relevant.

@@ -15,13 +15,13 @@ Read the project documentation before coding:
 Install dependencies:
 
 ```bash
-pnpm install
+npm install
 ```
 
 Run the development server:
 
 ```bash
-pnpm dev
+npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).

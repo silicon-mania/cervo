@@ -22,8 +22,7 @@ export default function SettingsPage() {
               <a
                 key={section.id}
                 href={`#${section.id}`}
-                className="border-b-2 border-foreground px-1 pb-3 text-sm font-medium"
-              >
+                className="border-b-2 border-foreground px-1 pb-3 text-sm font-medium">
                 {section.label}
               </a>
             ))}

@@ -1,13 +1,8 @@
-import {
-  ArrowUpRight,
-  Inbox,
-  Package,
-  PackageOpen,
-} from 'lucide-react';
+import { ArrowUpRight, Inbox, Package, PackageOpen } from "lucide-react";
 
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
 
-import type { BoxSummary } from '../server/queries';
+import type { BoxSummary } from "../server/queries";
 
 type BoxCardProps = {
   box: BoxSummary;
@@ -25,12 +20,11 @@ export function BoxCard({ box, onOpen }: BoxCardProps) {
       type="button"
       onClick={() => onOpen(box.id)}
       className={cn(
-        'text-left',
-        'group flex flex-col justify-between rounded-md border bg-background p-4',
-        'transition-colors hover:border-foreground/20 hover:bg-muted/20',
-        'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
-      )}
-    >
+        "text-left",
+        "group flex flex-col justify-between rounded-md border bg-background p-4",
+        "transition-colors hover:border-foreground/20 hover:bg-muted/20",
+        "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+      )}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-1">
           <div className="flex size-10 items-center justify-center">
@@ -53,12 +47,11 @@ export function UnsortedBoxCard({ noteCount, onOpen }: UnsortedBoxCardProps) {
       type="button"
       onClick={onOpen}
       className={cn(
-        'text-left',
-        'group flex flex-col justify-between rounded-md border border-dashed bg-muted/30 p-4',
-        'transition-colors hover:border-foreground/25 hover:bg-muted/45',
-        'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50'
-      )}
-    >
+        "text-left",
+        "group flex flex-col justify-between rounded-md border border-dashed bg-muted/30 p-4",
+        "transition-colors hover:border-foreground/25 hover:bg-muted/45",
+        "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+      )}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-1">
           <div className="flex size-10 items-center justify-center">
@@ -67,7 +60,7 @@ export function UnsortedBoxCard({ noteCount, onOpen }: UnsortedBoxCardProps) {
           <div className="min-w-0">
             <h3 className="truncate text-sm font-medium">Unsorted</h3>
             <p className="mt-1 text-xs text-muted-foreground">
-              {noteCount === 1 ? '1 note' : `${noteCount} notes`}
+              {noteCount === 1 ? "1 note" : `${noteCount} notes`}
             </p>
           </div>
         </div>

@@ -36,7 +36,7 @@ The product direction is an Obsidian-like company second brain: daily note first
 ```txt
 Next.js App Router
 TypeScript
-pnpm
+npm
 Clerk Auth + Organizations
 Clerk email OTP authentication
 Supabase Postgres
@@ -59,7 +59,7 @@ Vercel deployment
 
 - Project name: cervo.
 - Git-tracked app path: `/Users/hugobayoud/prog/silicon-mania/cervo`.
-- Package manager: pnpm.
+- Package manager: npm.
 - Repository structure: simple repository with `src/`, not a monorepo for the MVP.
 - shadcn base color: zinc.
 - Typography: Geist Sans for interface text and Geist Mono for metadata/code-like UI.
@@ -117,25 +117,25 @@ Rule:
 
 ### Package manager
 
-Decision: start with pnpm.
+Decision: use npm.
 
 Why:
 
-- Fast installs.
-- Strict dependency resolution.
-- Good long-term fit if the repo later becomes a monorepo.
+- It is the default Node.js package manager.
+- It keeps MVP setup simple for contributors and deployment environments.
+- It avoids the installation friction introduced by the previous package-manager setup.
 
 Tradeoff:
 
-- pnpm can be stricter around dependency build scripts and postinstall approval.
-- That strictness is useful, but it should not slow MVP development with repeated installation friction.
+- npm dependency resolution is less strict than some alternative package managers.
+- If the repo later becomes a monorepo, workspace ergonomics may need to be revisited.
 
 Rule:
 
 - Do not use obscure workarounds to force package installation.
 - Use documented package-manager flows only.
-- If pnpm repeatedly blocks normal dependency installation or wastes development time, switch the project to npm after explicit developer approval.
-- Do not mix package managers in the repo.
+- Use `npm install` to update `package-lock.json`.
+- Do not add alternative package-manager lockfiles to the repo.
 
 ### Clerk Auth + Organizations
 

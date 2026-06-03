@@ -41,9 +41,7 @@ export function MainWorkspace({
   initialLinkedDocuments,
 }: MainWorkspaceProps) {
   const [activeDocument, setActiveDocument] = useState(initialDocument);
-  const [loadingDocumentId, setLoadingDocumentId] = useState<string | null>(
-    null,
-  );
+  const [loadingDocumentId, setLoadingDocumentId] = useState<string | null>(null);
 
   const handleOpenDocument = async (documentId: string) => {
     if (activeDocument.id === documentId || loadingDocumentId === documentId) {
@@ -54,9 +52,7 @@ export function MainWorkspace({
 
     try {
       const response = await fetch(`/api/documents/${documentId}`);
-      const payload = (await response.json().catch(() => null)) as
-        | DocumentResponse
-        | null;
+      const payload = (await response.json().catch(() => null)) as DocumentResponse | null;
 
       if (!response.ok || !payload?.document) {
         throw new Error(payload?.error ?? "Unable to open document.");
@@ -91,11 +87,7 @@ export function MainWorkspace({
       <TodayEditor
         key={activeDocument.clientKey}
         documentId={activeDocument.id}
-        dailyNoteDate={
-          activeDocument.persistence === "virtual_daily"
-            ? activeDocument.date
-            : null
-        }
+        dailyNoteDate={activeDocument.persistence === "virtual_daily" ? activeDocument.date : null}
         title={activeDocument.title}
         initialContent={activeDocument.contentJson}
         initialContentText={activeDocument.contentText}

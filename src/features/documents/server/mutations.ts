@@ -29,12 +29,7 @@ export async function autosaveDocument({
       updatedBy,
       updatedAt: now,
     })
-    .where(
-      and(
-        eq(documents.id, documentId),
-        eq(documents.workspaceId, workspaceId),
-      ),
-    )
+    .where(and(eq(documents.id, documentId), eq(documents.workspaceId, workspaceId)))
     .returning({
       id: documents.id,
       updatedAt: documents.updatedAt,
