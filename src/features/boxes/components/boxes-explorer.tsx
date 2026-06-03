@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, FileText, LoaderCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,15 @@ type BoxesExplorerProps = {
   onOpenDocument?: (documentId: string) => void;
 };
 
-type ActiveTarget = { type: "root" } | { type: "unsorted" } | { type: "box"; boxId: string };
+type ActiveTarget =
+  | { type: "root" }
+  | { type: "unsorted" }
+  | {
+      type: "box";
+      boxId: string;
+      optimisticBox?: BoxSummary;
+      optimisticPath?: BoxSummary[];
+    };
 
 function sortBoxes(boxes: BoxSummary[]) {
   return [...boxes].sort((a, b) => a.name.localeCompare(b.name));
@@ -97,7 +105,6 @@ export function BoxesExplorer({
   loadingDocumentId,
   onOpenDocument,
 }: BoxesExplorerProps) {
-  const queryClient = useQueryClient();
   const [activeTarget, setActiveTarget] = useState<ActiveTarget>({
     type: "root",
   });
@@ -109,78 +116,99 @@ export function BoxesExplorer({
   });
 
   const activeBoxId = activeTarget.type === "box" ? activeTarget.boxId : null;
+  const isOptimisticBoxTarget =
+    activeTarget.type === "box" && Boolean(activeTarget.optimisticBox);
   const boxMemoryQuery = useQuery({
     queryKey: activeBoxId ? boxMemoryQueryKey(activeBoxId) : ["memory", "box", "idle"],
     queryFn: () => fetchMemoryData<BoxMemoryData>(activeBoxId ?? undefined),
-    enabled: Boolean(activeBoxId),
+    enabled: Boolean(activeBoxId) && !isOptimisticBoxTarget,
   });
 
   const rootMemory = rootMemoryQuery.data;
-  const boxMemory = activeTarget.type === "box" ? boxMemoryQuery.data : null;
-  const activeBox = boxMemory?.box ?? null;
-  const breadcrumbs = boxMemory?.path ?? [];
+  const boxMemory =
+    activeTarget.type === "box" && !isOptimisticBoxTarget ? boxMemoryQuery.data : null;
+  const activeBox =
+    activeTarget.type === "box" ? (activeTarget.optimisticBox ?? boxMemory?.box ?? null) : null;
+  const breadcrumbs = useMemo(() => {
+    if (activeTarget.type === "box" && activeTarget.optimisticPath) {
+      return activeTarget.optimisticPath;
+    }
+
+    return boxMemory?.path ?? [];
+  }, [activeTarget, boxMemory?.path]);
 
   const visibleBoxes = useMemo<BoxSummary[]>(() => {
     if (activeTarget.type === "root") {
       return sortBoxes(rootMemory.boxes);
     }
 
-    if (activeTarget.type === "box") {
+    if (activeTarget.type === "box" && !isOptimisticBoxTarget) {
       return sortBoxes(boxMemory?.childBoxes ?? []);
     }
 
     return [];
-  }, [activeTarget.type, boxMemory?.childBoxes, rootMemory.boxes]);
+  }, [activeTarget.type, boxMemory?.childBoxes, isOptimisticBoxTarget, rootMemory.boxes]);
 
   const visibleDocuments = useMemo<BoxDocumentSummary[]>(() => {
     if (activeTarget.type === "unsorted") {
       return rootMemory.unsortedDocuments;
     }
 
-    if (activeTarget.type === "box") {
+    if (activeTarget.type === "box" && !isOptimisticBoxTarget) {
       return boxMemory?.documents ?? [];
     }
 
     return [];
-  }, [activeTarget.type, boxMemory?.documents, rootMemory.unsortedDocuments]);
+  }, [activeTarget.type, boxMemory?.documents, isOptimisticBoxTarget, rootMemory.unsortedDocuments]);
 
-  const handleBoxCreated = useCallback(
+  const openBox = useCallback(
     (box: BoxSummary) => {
-      if (!box.parentBoxId) {
-        queryClient.setQueryData<RootMemoryData>(rootMemoryQueryKey, (currentData) => {
-          if (!currentData) {
-            return currentData;
-          }
-
-          const withoutDuplicate = currentData.boxes.filter(
-            (currentBox) => currentBox.id !== box.id,
-          );
-
-          return {
-            ...currentData,
-            boxes: sortBoxes([...withoutDuplicate, box]),
-          };
+      if (box.slug === "optimistic") {
+        setActiveTarget({
+          type: "box",
+          boxId: box.id,
+          optimisticBox: box,
+          optimisticPath: [...breadcrumbs, box],
         });
         return;
       }
 
-      queryClient.setQueryData<BoxMemoryData>(boxMemoryQueryKey(box.parentBoxId), (currentData) => {
-        if (!currentData) {
-          return currentData;
-        }
-
-        const withoutDuplicate = currentData.childBoxes.filter(
-          (currentBox) => currentBox.id !== box.id,
-        );
-
-        return {
-          ...currentData,
-          childBoxes: sortBoxes([...withoutDuplicate, box]),
-        };
-      });
+      setActiveTarget({ type: "box", boxId: box.id });
     },
-    [queryClient],
+    [breadcrumbs],
   );
+
+  const handleBoxCreated = useCallback((box: BoxSummary) => {
+    setActiveTarget((currentTarget) => {
+      if (
+        currentTarget.type !== "box" ||
+        !currentTarget.optimisticBox ||
+        currentTarget.optimisticBox.id !== box.id
+      ) {
+        return currentTarget;
+      }
+
+      return { type: "box", boxId: box.id };
+    });
+  }, []);
+
+  const handleBoxCreateFailed = useCallback((boxId: string, parentBoxId: string | null) => {
+    setActiveTarget((currentTarget) => {
+      if (
+        currentTarget.type !== "box" ||
+        !currentTarget.optimisticBox ||
+        currentTarget.optimisticBox.id !== boxId
+      ) {
+        return currentTarget;
+      }
+
+      if (!parentBoxId) {
+        return { type: "root" };
+      }
+
+      return { type: "box", boxId: parentBoxId };
+    });
+  }, []);
 
   const goBack = () => {
     if (activeTarget.type === "unsorted") {
@@ -266,6 +294,7 @@ export function BoxesExplorer({
             <CreateBoxForm
               parentBoxId={activeTarget.type === "box" ? activeTarget.boxId : undefined}
               onCreated={handleBoxCreated}
+              onCreateFailed={handleBoxCreateFailed}
             />
           </div>
         ) : null}
@@ -283,7 +312,7 @@ export function BoxesExplorer({
           <BoxCard
             key={box.id}
             box={box}
-            onOpen={(boxId) => setActiveTarget({ type: "box", boxId })}
+            onOpen={openBox}
           />
         ))}
 

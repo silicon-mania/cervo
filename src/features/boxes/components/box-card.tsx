@@ -6,7 +6,7 @@ import type { BoxSummary } from "../server/queries";
 
 type BoxCardProps = {
   box: BoxSummary;
-  onOpen: (boxId: string) => void;
+  onOpen: (box: BoxSummary) => void;
 };
 
 type UnsortedBoxCardProps = {
@@ -18,7 +18,7 @@ export function BoxCard({ box, onOpen }: BoxCardProps) {
   return (
     <button
       type="button"
-      onClick={() => onOpen(box.id)}
+      onClick={() => onOpen(box)}
       className={cn(
         "text-left",
         "group flex flex-col justify-between rounded-md border bg-background p-4",
