@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, FileText, LoaderCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -10,14 +11,13 @@ import { BoxCard, UnsortedBoxCard } from "@/features/boxes/components/box-card";
 import { CreateBoxForm } from "@/features/boxes/components/create-box-form";
 import type {
   BoxDocumentSummary,
+  BoxMemoryData,
   BoxSummary,
-  LinkedBoxDocumentSummary,
+  RootMemoryData,
 } from "@/features/boxes/server/queries";
 
 type BoxesExplorerProps = {
-  initialBoxes: BoxSummary[];
-  initialUnsortedDocuments: BoxDocumentSummary[];
-  initialLinkedDocuments: LinkedBoxDocumentSummary[];
+  initialMemoryData: RootMemoryData;
   loadingDocumentId?: string | null;
   onOpenDocument?: (documentId: string) => void;
 };
@@ -26,6 +26,29 @@ type ActiveTarget = { type: "root" } | { type: "unsorted" } | { type: "box"; box
 
 function sortBoxes(boxes: BoxSummary[]) {
   return [...boxes].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+const rootMemoryQueryKey = ["memory", "root"] as const;
+
+function boxMemoryQueryKey(boxId: string) {
+  return ["memory", "box", boxId] as const;
+}
+
+type MemoryResponse<T> = {
+  data?: T;
+  error?: string;
+};
+
+async function fetchMemoryData<T>(boxId?: string): Promise<T> {
+  const path = boxId ? `/api/memory?boxId=${encodeURIComponent(boxId)}` : "/api/memory";
+  const response = await fetch(path);
+  const payload = (await response.json().catch(() => null)) as MemoryResponse<T> | null;
+
+  if (!response.ok || !payload?.data) {
+    throw new Error(payload?.error ?? "Unable to load Memory.");
+  }
+
+  return payload.data;
 }
 
 function NoteCard({
@@ -70,76 +93,94 @@ function NoteCard({
 }
 
 export function BoxesExplorer({
-  initialBoxes,
-  initialUnsortedDocuments,
-  initialLinkedDocuments,
+  initialMemoryData,
   loadingDocumentId,
   onOpenDocument,
 }: BoxesExplorerProps) {
-  const [boxes, setBoxes] = useState(() => sortBoxes(initialBoxes));
+  const queryClient = useQueryClient();
   const [activeTarget, setActiveTarget] = useState<ActiveTarget>({
     type: "root",
   });
 
-  const boxesById = useMemo(() => new Map(boxes.map((box) => [box.id, box])), [boxes]);
+  const rootMemoryQuery = useQuery({
+    queryKey: rootMemoryQueryKey,
+    queryFn: () => fetchMemoryData<RootMemoryData>(),
+    initialData: initialMemoryData,
+  });
 
-  const activeBox = activeTarget.type === "box" ? boxesById.get(activeTarget.boxId) : null;
+  const activeBoxId = activeTarget.type === "box" ? activeTarget.boxId : null;
+  const boxMemoryQuery = useQuery({
+    queryKey: activeBoxId ? boxMemoryQueryKey(activeBoxId) : ["memory", "box", "idle"],
+    queryFn: () => fetchMemoryData<BoxMemoryData>(activeBoxId ?? undefined),
+    enabled: Boolean(activeBoxId),
+  });
 
-  const breadcrumbs = useMemo(() => {
-    if (!activeBox) {
-      return [];
-    }
+  const rootMemory = rootMemoryQuery.data;
+  const boxMemory = activeTarget.type === "box" ? boxMemoryQuery.data : null;
+  const activeBox = boxMemory?.box ?? null;
+  const breadcrumbs = boxMemory?.path ?? [];
 
-    const path: BoxSummary[] = [];
-    let currentBox: BoxSummary | undefined = activeBox;
-
-    for (let depth = 0; currentBox && depth < 12; depth += 1) {
-      path.unshift(currentBox);
-      currentBox = currentBox.parentBoxId ? boxesById.get(currentBox.parentBoxId) : undefined;
-    }
-
-    return path;
-  }, [activeBox, boxesById]);
-
-  const visibleBoxes = useMemo(() => {
+  const visibleBoxes = useMemo<BoxSummary[]>(() => {
     if (activeTarget.type === "root") {
-      return boxes.filter((box) => !box.parentBoxId);
+      return sortBoxes(rootMemory.boxes);
     }
 
     if (activeTarget.type === "box") {
-      return boxes.filter((box) => box.parentBoxId === activeTarget.boxId);
+      return sortBoxes(boxMemory?.childBoxes ?? []);
     }
 
     return [];
-  }, [activeTarget, boxes]);
+  }, [activeTarget.type, boxMemory?.childBoxes, rootMemory.boxes]);
 
-  const visibleDocuments = useMemo(() => {
+  const visibleDocuments = useMemo<BoxDocumentSummary[]>(() => {
     if (activeTarget.type === "unsorted") {
-      return initialUnsortedDocuments;
+      return rootMemory.unsortedDocuments;
     }
 
     if (activeTarget.type === "box") {
-      return initialLinkedDocuments
-        .filter((document) => document.boxId === activeTarget.boxId)
-        .map((document) => ({
-          id: document.id,
-          title: document.title,
-          type: document.type,
-          date: document.date,
-          updatedAt: document.updatedAt,
-        }));
+      return boxMemory?.documents ?? [];
     }
 
     return [];
-  }, [activeTarget, initialLinkedDocuments, initialUnsortedDocuments]);
+  }, [activeTarget.type, boxMemory?.documents, rootMemory.unsortedDocuments]);
 
-  const handleBoxCreated = useCallback((box: BoxSummary) => {
-    setBoxes((currentBoxes) => {
-      const withoutDuplicate = currentBoxes.filter((currentBox) => currentBox.id !== box.id);
+  const handleBoxCreated = useCallback(
+    (box: BoxSummary) => {
+      if (!box.parentBoxId) {
+        queryClient.setQueryData<RootMemoryData>(rootMemoryQueryKey, (currentData) => {
+          if (!currentData) {
+            return currentData;
+          }
 
-      return sortBoxes([...withoutDuplicate, box]);
-    });
-  }, []);
+          const withoutDuplicate = currentData.boxes.filter(
+            (currentBox) => currentBox.id !== box.id,
+          );
+
+          return {
+            ...currentData,
+            boxes: sortBoxes([...withoutDuplicate, box]),
+          };
+        });
+        return;
+      }
+
+      queryClient.setQueryData<BoxMemoryData>(boxMemoryQueryKey(box.parentBoxId), (currentData) => {
+        if (!currentData) {
+          return currentData;
+        }
+
+        const withoutDuplicate = currentData.childBoxes.filter(
+          (currentBox) => currentBox.id !== box.id,
+        );
+
+        return {
+          ...currentData,
+          childBoxes: sortBoxes([...withoutDuplicate, box]),
+        };
+      });
+    },
+    [queryClient],
+  );
 
   const goBack = () => {
     if (activeTarget.type === "unsorted") {
@@ -157,6 +198,8 @@ export function BoxesExplorer({
 
   const hasContent =
     activeTarget.type === "root" || visibleBoxes.length > 0 || visibleDocuments.length > 0;
+  const isMemoryLoading = activeTarget.type === "box" && boxMemoryQuery.isLoading;
+  const memoryError = rootMemoryQuery.isError || boxMemoryQuery.isError;
 
   return (
     <section className="mt-8 pt-6">
@@ -209,6 +252,11 @@ export function BoxesExplorer({
                   </span>
                 );
               })}
+              {activeTarget.type === "box" && breadcrumbs.length === 0 ? (
+                <span className="truncate text-muted-foreground">
+                  {isMemoryLoading ? "Loading" : "Box"}
+                </span>
+              ) : null}
             </nav>
           )}
         </div>
@@ -226,7 +274,7 @@ export function BoxesExplorer({
       <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {activeTarget.type === "root" ? (
           <UnsortedBoxCard
-            noteCount={initialUnsortedDocuments.length}
+            noteCount={rootMemory.unsortedDocuments.length}
             onOpen={() => setActiveTarget({ type: "unsorted" })}
           />
         ) : null}
@@ -248,6 +296,21 @@ export function BoxesExplorer({
           />
         ))}
       </div>
+
+      {isMemoryLoading ? (
+        <div className="mt-5 flex items-center gap-2 rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+          <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+          Loading Memory
+        </div>
+      ) : null}
+
+      {memoryError ? (
+        <div
+          className="mt-5 rounded-md border border-dashed p-4 text-sm text-muted-foreground"
+          role="alert">
+          Memory could not load. Try again in a moment.
+        </div>
+      ) : null}
 
       {!hasContent ? (
         <div className="mt-5 rounded-md border border-dashed p-4 text-sm text-muted-foreground">

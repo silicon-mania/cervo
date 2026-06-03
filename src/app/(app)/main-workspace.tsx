@@ -3,12 +3,9 @@
 import type { JSONContent } from "@tiptap/react";
 import { useState } from "react";
 
+import { QueryProvider } from "@/components/providers/query-provider";
 import { BoxesExplorer } from "@/features/boxes/components/boxes-explorer";
-import type {
-  BoxDocumentSummary,
-  BoxSummary,
-  LinkedBoxDocumentSummary,
-} from "@/features/boxes/server/queries";
+import type { RootMemoryData } from "@/features/boxes/server/queries";
 import { TodayEditor } from "@/features/daily-notes/components/today-editor";
 
 type ActiveEditorDocument = {
@@ -24,9 +21,7 @@ type ActiveEditorDocument = {
 
 type MainWorkspaceProps = {
   initialDocument: ActiveEditorDocument;
-  initialBoxes: BoxSummary[];
-  initialUnsortedDocuments: BoxDocumentSummary[];
-  initialLinkedDocuments: LinkedBoxDocumentSummary[];
+  initialMemoryData: RootMemoryData;
 };
 
 type DocumentResponse = {
@@ -34,12 +29,7 @@ type DocumentResponse = {
   error?: string;
 };
 
-export function MainWorkspace({
-  initialDocument,
-  initialBoxes,
-  initialUnsortedDocuments,
-  initialLinkedDocuments,
-}: MainWorkspaceProps) {
+export function MainWorkspace({ initialDocument, initialMemoryData }: MainWorkspaceProps) {
   const [activeDocument, setActiveDocument] = useState(initialDocument);
   const [loadingDocumentId, setLoadingDocumentId] = useState<string | null>(null);
 
@@ -95,13 +85,13 @@ export function MainWorkspace({
         onDocumentPersisted={handleDocumentPersisted}
       />
 
-      <BoxesExplorer
-        initialBoxes={initialBoxes}
-        initialUnsortedDocuments={initialUnsortedDocuments}
-        initialLinkedDocuments={initialLinkedDocuments}
-        loadingDocumentId={loadingDocumentId}
-        onOpenDocument={handleOpenDocument}
-      />
+      <QueryProvider>
+        <BoxesExplorer
+          initialMemoryData={initialMemoryData}
+          loadingDocumentId={loadingDocumentId}
+          onOpenDocument={handleOpenDocument}
+        />
+      </QueryProvider>
     </>
   );
 }

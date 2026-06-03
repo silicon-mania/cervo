@@ -1,12 +1,12 @@
 import { AppShell } from "@/components/layout/app-shell";
-import { getMainBoxesData } from "@/features/boxes/server/queries";
+import { getRootMemoryData } from "@/features/boxes/server/queries";
 import { getTodayDocumentForEditor } from "@/features/daily-notes";
 
 import { MainWorkspace } from "./main-workspace";
 
 export default async function AppHomePage() {
   const { document } = await getTodayDocumentForEditor();
-  const boxesData = await getMainBoxesData();
+  const memoryData = await getRootMemoryData();
 
   return (
     <AppShell>
@@ -23,9 +23,7 @@ export default async function AppHomePage() {
               contentJson: document.contentJson,
               contentText: document.contentText,
             }}
-            initialBoxes={boxesData.boxes}
-            initialUnsortedDocuments={boxesData.unsortedDocuments}
-            initialLinkedDocuments={boxesData.linkedDocuments}
+            initialMemoryData={memoryData}
           />
         </div>
       </main>
