@@ -96,6 +96,27 @@ function MainWorkspaceContent({ initialDocument, initialMemoryData }: MainWorksp
     });
   };
 
+  const handleCreatedDocument = (document: EditorDocument) => {
+    let previousDocument: ActiveEditorDocument | null = null;
+
+    setOpenDocumentError(null);
+    setLoadingDocumentId(null);
+    setActiveDocument((currentDocument) => {
+      previousDocument = currentDocument;
+      return buildPersistedEditorDocument(document);
+    });
+
+    return () => {
+      setActiveDocument((currentDocument) => {
+        if (currentDocument.id !== document.id || !previousDocument) {
+          return currentDocument;
+        }
+
+        return previousDocument;
+      });
+    };
+  };
+
   return (
     <>
       <TodayEditor
@@ -114,6 +135,7 @@ function MainWorkspaceContent({ initialDocument, initialMemoryData }: MainWorksp
         openDocumentError={openDocumentError}
         loadingDocumentId={loadingDocumentId}
         onOpenDocument={handleOpenDocument}
+        onCreateDocument={handleCreatedDocument}
       />
     </>
   );

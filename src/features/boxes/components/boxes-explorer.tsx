@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, FileText, LoaderCircle } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight, FileText, LoaderCircle, Plus } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,7 @@ import type {
 import {
   editorDocumentQueryKey,
   fetchEditorDocument,
+  type EditorDocument,
 } from "@/features/documents/client/queries";
 
 type BoxesExplorerProps = {
@@ -25,6 +27,7 @@ type BoxesExplorerProps = {
   openDocumentError?: string | null;
   loadingDocumentId?: string | null;
   onOpenDocument?: (documentId: string) => void;
+  onCreateDocument?: (document: EditorDocument) => (() => void) | void;
 };
 
 type ActiveTarget =
@@ -47,6 +50,11 @@ function boxMemoryQueryKey(boxId: string) {
   return ["memory", "box", boxId] as const;
 }
 
+const emptyEditorContent: EditorDocument["contentJson"] = {
+  type: "doc",
+  content: [],
+};
+
 type MemoryResponse<T> = {
   data?: T;
   error?: string;
@@ -63,6 +71,63 @@ async function fetchMemoryData<T>(boxId?: string): Promise<T> {
 
   return payload.data;
 }
+
+type CreateNoteRequest = {
+  id: string;
+  boxId: string | null;
+};
+
+type CreateNoteResponse = {
+  document: EditorDocument;
+  summary: BoxDocumentSummary;
+  boxId: string | null;
+  error?: string;
+};
+
+async function createNoteRequest(input: CreateNoteRequest) {
+  const response = await fetch("/api/documents", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const payload = (await response.json().catch(() => null)) as CreateNoteResponse | null;
+
+  if (!response.ok || !payload?.document || !payload.summary) {
+    throw new Error(payload?.error ?? "Unable to create note.");
+  }
+
+  return payload;
+}
+
+function sortDocuments(documents: BoxDocumentSummary[]) {
+  return [...documents].sort((a, b) => a.title.localeCompare(b.title));
+}
+
+function insertDocument(documents: BoxDocumentSummary[], document: BoxDocumentSummary) {
+  const withoutDuplicate = documents.filter((currentDocument) => currentDocument.id !== document.id);
+
+  return sortDocuments([...withoutDuplicate, document]);
+}
+
+function replaceDocument(
+  documents: BoxDocumentSummary[],
+  optimisticDocumentId: string,
+  document: BoxDocumentSummary,
+) {
+  return sortDocuments(
+    documents.map((currentDocument) =>
+      currentDocument.id === optimisticDocumentId ? document : currentDocument,
+    ),
+  );
+}
+
+type CreateNoteContext = {
+  optimisticDocumentId: string;
+  boxId: string | null;
+  previousRootMemory?: RootMemoryData;
+  previousBoxMemory?: BoxMemoryData;
+  restoreActiveDocument?: () => void;
+};
 
 function NoteCard({
   document,
@@ -110,6 +175,7 @@ export function BoxesExplorer({
   openDocumentError,
   loadingDocumentId,
   onOpenDocument,
+  onCreateDocument,
 }: BoxesExplorerProps) {
   const queryClient = useQueryClient();
   const [activeTarget, setActiveTarget] = useState<ActiveTarget>({
@@ -167,6 +233,135 @@ export function BoxesExplorer({
 
     return [];
   }, [activeTarget.type, boxMemory?.documents, isOptimisticBoxTarget, rootMemory.unsortedDocuments]);
+
+  const createNoteMutation = useMutation<
+    CreateNoteResponse,
+    Error,
+    CreateNoteRequest,
+    CreateNoteContext
+  >({
+    mutationFn: createNoteRequest,
+    onMutate: async (input) => {
+      const optimisticDocument: EditorDocument = {
+        id: input.id,
+        title: "Undefined",
+        type: "note",
+        date: null,
+        contentJson: emptyEditorContent,
+        contentText: "",
+      };
+      const optimisticSummary: BoxDocumentSummary = {
+        id: input.id,
+        title: "Undefined",
+        type: "note",
+        date: null,
+        updatedAt: new Date().toISOString(),
+      };
+
+      queryClient.setQueryData(editorDocumentQueryKey(input.id), optimisticDocument);
+      const restoreActiveDocument = onCreateDocument?.(optimisticDocument) ?? undefined;
+
+      if (!input.boxId) {
+        await queryClient.cancelQueries({ queryKey: rootMemoryQueryKey });
+        const previousRootMemory = queryClient.getQueryData<RootMemoryData>(rootMemoryQueryKey);
+
+        queryClient.setQueryData<RootMemoryData>(rootMemoryQueryKey, (currentData) => {
+          if (!currentData) {
+            return currentData;
+          }
+
+          return {
+            ...currentData,
+            unsortedDocuments: insertDocument(currentData.unsortedDocuments, optimisticSummary),
+          };
+        });
+
+        return {
+          optimisticDocumentId: input.id,
+          boxId: input.boxId,
+          previousRootMemory,
+          restoreActiveDocument,
+        };
+      }
+
+      const queryKey = boxMemoryQueryKey(input.boxId);
+      await queryClient.cancelQueries({ queryKey });
+      const previousBoxMemory = queryClient.getQueryData<BoxMemoryData>(queryKey);
+
+      queryClient.setQueryData<BoxMemoryData>(queryKey, (currentData) => {
+        if (!currentData) {
+          return currentData;
+        }
+
+        return {
+          ...currentData,
+          documents: insertDocument(currentData.documents, optimisticSummary),
+        };
+      });
+
+      return {
+        optimisticDocumentId: input.id,
+        boxId: input.boxId,
+        previousBoxMemory,
+        restoreActiveDocument,
+      };
+    },
+    onSuccess: (note, _input, context) => {
+      queryClient.setQueryData(editorDocumentQueryKey(note.document.id), note.document);
+
+      if (!context.boxId) {
+        queryClient.setQueryData<RootMemoryData>(rootMemoryQueryKey, (currentData) => {
+          if (!currentData) {
+            return currentData;
+          }
+
+          return {
+            ...currentData,
+            unsortedDocuments: replaceDocument(
+              currentData.unsortedDocuments,
+              context.optimisticDocumentId,
+              note.summary,
+            ),
+          };
+        });
+        return;
+      }
+
+      queryClient.setQueryData<BoxMemoryData>(boxMemoryQueryKey(context.boxId), (currentData) => {
+        if (!currentData) {
+          return currentData;
+        }
+
+        return {
+          ...currentData,
+          documents: replaceDocument(
+            currentData.documents,
+            context.optimisticDocumentId,
+            note.summary,
+          ),
+        };
+      });
+    },
+    onError: (_error, _input, context) => {
+      if (!context) {
+        return;
+      }
+
+      queryClient.removeQueries({
+        queryKey: editorDocumentQueryKey(context.optimisticDocumentId),
+        exact: true,
+      });
+
+      if (!context.boxId) {
+        queryClient.setQueryData(rootMemoryQueryKey, context.previousRootMemory);
+      } else {
+        queryClient.setQueryData(boxMemoryQueryKey(context.boxId), context.previousBoxMemory);
+      }
+
+      context.restoreActiveDocument?.();
+      toast.error("Note could not be created. Try again in a moment.");
+    },
+  });
 
   useEffect(() => {
     for (const document of visibleDocuments) {
@@ -240,6 +435,17 @@ export function BoxesExplorer({
     setActiveTarget({ type: "box", boxId: activeBox.parentBoxId });
   };
 
+  const createNote = () => {
+    if (activeTarget.type === "box" && isOptimisticBoxTarget) {
+      return;
+    }
+
+    createNoteMutation.mutate({
+      id: crypto.randomUUID(),
+      boxId: activeTarget.type === "box" ? activeTarget.boxId : null,
+    });
+  };
+
   const hasContent =
     activeTarget.type === "root" || visibleBoxes.length > 0 || visibleDocuments.length > 0;
   const isMemoryLoading = activeTarget.type === "box" && boxMemoryQuery.isLoading;
@@ -305,15 +511,24 @@ export function BoxesExplorer({
           )}
         </div>
 
-        {activeTarget.type !== "unsorted" ? (
-          <div className="w-full sm:max-w-sm">
-            <CreateBoxForm
-              parentBoxId={activeTarget.type === "box" ? activeTarget.boxId : undefined}
-              onCreated={handleBoxCreated}
-              onCreateFailed={handleBoxCreateFailed}
-            />
-          </div>
-        ) : null}
+        <div className="flex w-full flex-col gap-2 sm:max-w-lg sm:flex-row sm:justify-end">
+          {!isOptimisticBoxTarget ? (
+            <Button type="button" variant="outline" className="gap-2" onClick={createNote}>
+              <Plus className="size-4" aria-hidden="true" />
+              <span>New Note</span>
+            </Button>
+          ) : null}
+
+          {activeTarget.type !== "unsorted" ? (
+            <div className="min-w-0 flex-1 sm:max-w-sm">
+              <CreateBoxForm
+                parentBoxId={activeTarget.type === "box" ? activeTarget.boxId : undefined}
+                onCreated={handleBoxCreated}
+                onCreateFailed={handleBoxCreateFailed}
+              />
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -325,11 +540,7 @@ export function BoxesExplorer({
         ) : null}
 
         {visibleBoxes.map((box) => (
-          <BoxCard
-            key={box.id}
-            box={box}
-            onOpen={openBox}
-          />
+          <BoxCard key={box.id} box={box} onOpen={openBox} />
         ))}
 
         {visibleDocuments.map((document) => (
