@@ -8,18 +8,27 @@ const AUTOSAVE_DELAY_MS = 1000;
 
 type AutosaveStatus = "idle" | "saving" | "saved" | "error";
 
+export type DocumentAutosaveValue = DocumentEditorValue & {
+  title: string;
+};
+
 type UseDocumentAutosaveOptions = {
-  documentId: string;
+  documentId?: string | null;
+  dailyNoteDate?: string | null;
+  onDocumentPersisted?: (documentId: string) => void;
 };
 
 export function useDocumentAutosave({
   documentId,
+  dailyNoteDate,
+  onDocumentPersisted,
 }: UseDocumentAutosaveOptions) {
+  const persistedDocumentIdRef = useRef(documentId ?? null);
   const latestDraftRevisionRef = useRef(0);
-  const latestDraftRef = useRef<DocumentEditorValue | null>(null);
+  const latestDraftRef = useRef<DocumentAutosaveValue | null>(null);
   const savedRevisionRef = useRef(0);
   const attemptedRevisionRef = useRef(0);
-  const [draft, setDraft] = useState<DocumentEditorValue | null>(null);
+  const [draft, setDraft] = useState<DocumentAutosaveValue | null>(null);
   const [draftRevision, setDraftRevision] = useState(0);
   const [attemptedRevision, setAttemptedRevision] = useState(0);
   const [savedRevision, setSavedRevision] = useState(0);
@@ -27,7 +36,19 @@ export function useDocumentAutosave({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleChange = useCallback((value: DocumentEditorValue) => {
+  const getAutosaveUrl = useCallback(() => {
+    if (persistedDocumentIdRef.current) {
+      return `/api/documents/${persistedDocumentIdRef.current}/autosave`;
+    }
+
+    if (dailyNoteDate) {
+      return `/api/daily-notes/${dailyNoteDate}/autosave`;
+    }
+
+    return null;
+  }, [dailyNoteDate]);
+
+  const handleChange = useCallback((value: DocumentAutosaveValue) => {
     latestDraftRef.current = value;
     setDraft(value);
     setDraftRevision((revision) => {
@@ -42,7 +63,15 @@ export function useDocumentAutosave({
   }, []);
 
   const saveDraft = useCallback(
-    async (revision: number, value: DocumentEditorValue) => {
+    async (revision: number, value: DocumentAutosaveValue) => {
+      const autosaveUrl = getAutosaveUrl();
+
+      if (!autosaveUrl) {
+        setStatus("error");
+        setErrorMessage("Unable to save this document.");
+        return;
+      }
+
       setIsSaving(true);
       setAttemptedRevision(revision);
       attemptedRevisionRef.current = revision;
@@ -50,7 +79,7 @@ export function useDocumentAutosave({
       setErrorMessage(null);
 
       try {
-        const response = await fetch(`/api/documents/${documentId}/autosave`, {
+        const response = await fetch(autosaveUrl, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -64,6 +93,16 @@ export function useDocumentAutosave({
             | null;
 
           throw new Error(payload?.error ?? "Couldn’t save changes.");
+        }
+
+        const payload = (await response.json().catch(() => null)) as
+          | { document?: { id?: string } }
+          | null;
+        const persistedDocumentId = payload?.document?.id;
+
+        if (!persistedDocumentIdRef.current && persistedDocumentId) {
+          persistedDocumentIdRef.current = persistedDocumentId;
+          onDocumentPersisted?.(persistedDocumentId);
         }
 
         setSavedRevision((currentRevision) =>
@@ -80,15 +119,20 @@ export function useDocumentAutosave({
         setIsSaving(false);
       }
     },
-    [documentId],
+    [getAutosaveUrl, onDocumentPersisted],
   );
+
+  useEffect(() => {
+    persistedDocumentIdRef.current = documentId ?? null;
+  }, [documentId]);
 
   useEffect(() => {
     const flushPendingDraft = () => {
       const latestDraft = latestDraftRef.current;
       const latestDraftRevision = latestDraftRevisionRef.current;
+      const autosaveUrl = getAutosaveUrl();
 
-      if (!latestDraft) {
+      if (!latestDraft || !autosaveUrl) {
         return;
       }
 
@@ -105,14 +149,14 @@ export function useDocumentAutosave({
       if (typeof navigator !== "undefined" && "sendBeacon" in navigator) {
         const blob = new Blob([payload], { type: "application/json" });
 
-        navigator.sendBeacon(`/api/documents/${documentId}/autosave`, blob);
+        navigator.sendBeacon(autosaveUrl, blob);
 
         attemptedRevisionRef.current = latestDraftRevision;
 
         return;
       }
 
-      void fetch(`/api/documents/${documentId}/autosave`, {
+      void fetch(autosaveUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -134,10 +178,11 @@ export function useDocumentAutosave({
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
+      flushPendingDraft();
       window.removeEventListener("pagehide", flushPendingDraft);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [documentId]);
+  }, [getAutosaveUrl]);
 
   useEffect(() => {
     if (!draft || draftRevision === 0) {

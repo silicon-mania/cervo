@@ -1,2 +1,5 @@
-export { getOrCreateTodayDocument } from "./server/queries";
-export type { DailyNote } from "./server/queries";
+export {
+  getOrCreateTodayDocument,
+  getTodayDocumentForEditor,
+} from "./server/queries";
+export type { DailyNote, TodayDocumentForEditor } from "./server/queries";

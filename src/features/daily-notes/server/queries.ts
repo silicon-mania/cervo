@@ -28,6 +28,20 @@ export type DailyNote = {
   updatedBy: string;
 };
 
+export type TodayDocumentForEditor =
+  | (DailyNote & {
+      persistence: "persisted";
+    })
+  | {
+      id: null;
+      persistence: "virtual_daily";
+      title: string;
+      type: "daily_note";
+      date: string;
+      contentJson: JSONContent;
+      contentText: string;
+    };
+
 function selectDailyNoteFields() {
   return {
     id: documents.id,
@@ -120,6 +134,52 @@ export async function getOrCreateTodayDocument() {
   return {
     date: todayDate,
     document: assertDailyNoteDate(document),
+    timeZone,
+    workspace,
+  };
+}
+
+export async function getTodayDocumentForEditor() {
+  const { workspace } = await requireWorkspace();
+  const db = getDb();
+  const timeZone = getAppTimeZone();
+  const todayDate = getDateKeyInTimeZone({ timeZone });
+
+  const [existingDocument] = await db
+    .select(selectDailyNoteFields())
+    .from(documents)
+    .where(
+      and(
+        eq(documents.workspaceId, workspace.id),
+        eq(documents.type, "daily_note"),
+        eq(documents.date, todayDate),
+      ),
+    )
+    .limit(1);
+
+  if (existingDocument) {
+    return {
+      date: todayDate,
+      document: {
+        ...assertDailyNoteDate(existingDocument),
+        persistence: "persisted" as const,
+      },
+      timeZone,
+      workspace,
+    };
+  }
+
+  return {
+    date: todayDate,
+    document: {
+      id: null,
+      persistence: "virtual_daily" as const,
+      title: getDailyNoteTitle(todayDate),
+      type: "daily_note" as const,
+      date: todayDate,
+      contentJson: emptyDocumentContent,
+      contentText: "",
+    },
     timeZone,
     workspace,
   };

@@ -5,8 +5,13 @@ export const documentAutosaveParamsSchema = z.object({
 });
 
 export const documentAutosaveInputSchema = z.object({
+  title: z.string().max(200),
   contentJson: z.unknown(),
   contentText: z.string(),
+});
+
+export const dailyNoteAutosaveParamsSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 
 export type DocumentAutosaveInput = z.infer<typeof documentAutosaveInputSchema>;

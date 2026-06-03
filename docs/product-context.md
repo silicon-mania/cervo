@@ -1,9 +1,5 @@
 # Product context
 
-Source: meeting recap dated 2026-06-01.
-
-In the transcript, `Me` means Adil, the client. `Them` means Hugo, the developer asking questions.
-
 ## One-line direction
 
 An Obsidian-like company second brain, connected to calendar, mail, CRM, and AI, centered on the daily note and project boxes so users can dump their thoughts instantly, then retrieve or activate information without friction.
@@ -14,7 +10,7 @@ Dump your mind. Find everything. Move the company forward.
 
 ## Core problem
 
-Adil is overwhelmed by fragmented information flows: calendar, email, messages, CRM, sponsors, meetings, production tasks, content formats, magazine operations, and files. There is no natural place where he can quickly empty his mind, structure what matters, and retrieve the right information later.
+Users are overwhelmed by fragmented information flows: calendar, email, messages, CRM, sponsors, meetings, production tasks, content formats, magazine operations, and files. There is no natural place where he can quickly empty his mind, structure what matters, and retrieve the right information later.
 
 Existing tools do not solve this well:
 
@@ -46,7 +42,7 @@ The main app route `/` is the default product entry point. It opens on today's d
 
 It should support:
 
-- Automatic daily note creation.
+- Automatic daily note availability without storing an untouched empty daily note.
 - Multiple notes per day later.
 - Fast capture.
 - Explicit tasks and checkboxes.
@@ -55,16 +51,13 @@ It should support:
 
 The date gives the workspace a natural structure and prevents the user from starting from a blank, abstract dashboard.
 
+The daily note surface should always be available when the user enters the app. It becomes a stored note only after the user changes its title or content. If the user opens the app only to browse or edit older notes and leaves the default daily note untouched, the app should not create an unnecessary daily note row.
+
 The main page combines today's daily note and boxes on one continuous surface. The daily note should dominate the first viewport, taking roughly three quarters of the main content height, with the first boxes visible just below it. Scrolling the main content reveals the rest of the boxes. The daily note area should have an expansion control that lets writing-focused users grow the note area to its content height and reduce box visual noise, while keeping the inbox and calendar rail visible.
 
 ### Boxes
 
-Each project is a box.
-
-A box is both:
-
-- A home document: summary, tasks, status, context, people, links.
-- A container: files, notes, assets, attachments, references.
+Each project is a box. A box is a container for notes, child boxes, files, assets, attachments, and references.
 
 Examples:
 
@@ -76,13 +69,21 @@ Examples:
 
 This is one of the strongest product metaphors from the meeting: a project should feel like a box you can open, inspect, add to, archive, or move to the future.
 
-Boxes and notes have a many-to-many relationship. A note can belong to several boxes without being duplicated, and a box can contain several notes. Assigning a daily note to a box links the existing document to that box; it does not create a second copy of the note.
+Boxes and notes have a many-to-many relationship through box placements. A note can be placed in several boxes without being duplicated, and a box can contain several placed notes. Assigning a daily note to a box links the existing document to that box; it does not create a second copy of the note.
 
-The default box is named `Unsorted` in the UI. It is a visible catch-all for notes that have not been sorted yet. It should not behave like a normal user-managed project box: it cannot be renamed or deleted, and it may be represented as a virtual/system view rather than a normal database row. A daily note can start in `Unsorted`, then be removed from it once the user has sorted the note into one or more specific boxes.
+The default box is named `Unsorted` in the UI. It is a visible catch-all for notes that have not been placed in any box. It should not behave like a normal user-managed project box: it cannot be renamed or deleted, and it may be represented as a virtual/system view rather than a normal database row. A daily note can start in `Unsorted`, then disappear from `Unsorted` once the user links the note to one or more specific boxes.
+
+If the user removes the last box placement from a note, the note should immediately appear in `Unsorted`. The note remains open if it is the active editor document; only its placement state changes.
 
 Boxes can also contain child boxes. Opening a box should happen inside the main page `/` as a smooth drill-down state in the boxes section, not by navigating to a separate route. The daily note area must remain stable while the boxes section changes. The navigation model can borrow from familiar file/folder interfaces such as Google Drive: visible child boxes, notes/documents, a back action, and a clear path or breadcrumb.
 
-For the current phase, notes shown inside boxes are not clickable. Opening a note from a box and temporarily replacing the daily note editor is a later workflow that needs a dedicated active-document state.
+Creating a root box or child box should create only the empty box container. The app must not automatically create a note inside the box. Inside an empty or non-empty box, the user should have quick actions to create a new note or a new child box.
+
+Opening a note from a box is a separate, deliberate action from opening a box. Box clicks only drill down the boxes section. Note clicks may replace the editor with that note, but the app should prefetch or cache note content once the box view is visible so opening the note feels close to instant and avoids a visible loading spinner.
+
+Creating a new note from inside a box is an explicit writing action. It should immediately replace the current editor document with an empty note titled `Undefined`, autofocus the editor content, and link the note to the current box. It should not appear in `Unsorted`, because `Unsorted` only contains notes with no box placement.
+
+The current editor should have a lightweight `Add to box` action in the top-right document action area. The action should open a minimalist popover for placing the current note in one or more boxes, removing existing placements, and quickly creating a new box from inside the same flow. Creating a box from inside this popover should automatically place the current note in the new box. New boxes created from the popover should default to root boxes unless the user has selected or navigated to a parent box; in that case, the new box should be created as a child of that parent.
 
 ### Archives
 
@@ -105,7 +106,7 @@ The MVP demo should prove this flow:
 3. The user captures raw thoughts, links, pasted text, and files.
 4. The user creates a task or checkbox quickly through slash commands or keyboard interactions.
 5. The user selects text and turns it into a task.
-6. The user opens a project box and sees its home document.
+6. The user opens a project box and sees its child boxes and notes.
 7. The user searches globally and finds something quickly.
 8. The user sees calendar/inbox context without losing the central note.
 9. The user asks the assistant to summarize, extract, or organize from the current context.
@@ -127,7 +128,7 @@ Must have:
 - Basic keyboard shortcuts such as Cmd+B and Cmd+I.
 - Slash commands for task and checkbox creation.
 - Text selection menu with contextual actions.
-- Project boxes with home documents, child boxes, and many-to-many note membership.
+- Project boxes with child boxes, explicit note creation, and many-to-many box placement.
 - Tasks linked to documents and boxes.
 - Global search across core entities, always reachable from the top bar.
 - DB-backed mock calendar panel.
@@ -160,7 +161,7 @@ Not required for MVP:
 - Optimize for speed of capture.
 - Optimize for demo magic.
 - Keep the interface minimal and familiar.
-- Do not add noise to Adil's workflow.
+- Do not add noise to User's workflow.
 - Do not turn the product into Notion.
 - Prefer documents, boxes, search, and context over dashboards.
 - Make AI contextual and useful, not dominant.

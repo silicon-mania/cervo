@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileText, LoaderCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,8 @@ type BoxesExplorerProps = {
   initialBoxes: BoxSummary[];
   initialUnsortedDocuments: BoxDocumentSummary[];
   initialLinkedDocuments: LinkedBoxDocumentSummary[];
+  loadingDocumentId?: string | null;
+  onOpenDocument?: (documentId: string) => void;
 };
 
 type ActiveTarget =
@@ -29,12 +31,25 @@ function sortBoxes(boxes: BoxSummary[]) {
   return [...boxes].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function NoteCard({ document }: { document: BoxDocumentSummary }) {
+function NoteCard({
+  document,
+  isLoading = false,
+  onOpen,
+}: {
+  document: BoxDocumentSummary;
+  isLoading?: boolean;
+  onOpen?: (documentId: string) => void;
+}) {
   return (
-    <div
+    <button
+      type="button"
+      onClick={() => onOpen?.(document.id)}
+      disabled={!onOpen || isLoading}
       className={cn(
         'flex min-h-36 flex-col justify-between rounded-md border bg-background p-4',
-        'text-left transition-colors'
+        'text-left transition-colors hover:border-foreground/20 hover:bg-muted/20',
+        'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
+        'disabled:pointer-events-none disabled:opacity-70'
       )}
     >
       <div className="flex items-start gap-3">
@@ -50,7 +65,13 @@ function NoteCard({ document }: { document: BoxDocumentSummary }) {
           ) : null}
         </div>
       </div>
-    </div>
+      {isLoading ? (
+        <LoaderCircle
+          className="mt-4 size-4 animate-spin self-end text-muted-foreground"
+          aria-hidden="true"
+        />
+      ) : null}
+    </button>
   );
 }
 
@@ -58,6 +79,8 @@ export function BoxesExplorer({
   initialBoxes,
   initialUnsortedDocuments,
   initialLinkedDocuments,
+  loadingDocumentId,
+  onOpenDocument,
 }: BoxesExplorerProps) {
   const [boxes, setBoxes] = useState(() => sortBoxes(initialBoxes));
   const [activeTarget, setActiveTarget] = useState<ActiveTarget>({
@@ -153,6 +176,8 @@ export function BoxesExplorer({
 
   return (
     <section className="mt-8 pt-6">
+      <h2 className="text-2xl font-medium text-center">Memory</h2>
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-2">
           {activeTarget.type !== 'root' ? (
@@ -167,9 +192,7 @@ export function BoxesExplorer({
             </Button>
           ) : null}
 
-          {activeTarget.type === 'root' ? (
-            <h2 className="text-base font-medium">Boxes</h2>
-          ) : (
+          {activeTarget.type === 'root' ? null : (
             <nav
               aria-label="Box path"
               className="flex min-w-0 items-center gap-1 text-sm"
@@ -250,7 +273,12 @@ export function BoxesExplorer({
         ))}
 
         {visibleDocuments.map((document) => (
-          <NoteCard key={document.id} document={document} />
+          <NoteCard
+            key={document.id}
+            document={document}
+            isLoading={loadingDocumentId === document.id}
+            onOpen={onOpenDocument}
+          />
         ))}
       </div>
 

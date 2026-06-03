@@ -8,14 +8,23 @@ The product direction is an Obsidian-like company second brain: daily note first
 
 ## Product constraints that drive the tech
 
-- The app must open on `/`, the main page. That page shows today's daily note by default plus the top-level boxes.
+- The app must open on `/`, the main page. That page shows today's daily note surface by default plus the top-level boxes.
+- The daily note surface is lazily persisted: render it immediately, but create the database row only after the user changes its title or content.
 - Capture must be immediate: type, paste, drag, drop, save.
 - The editor must feel closer to Obsidian than Notion.
 - The central note must never be replaced by secondary panels.
-- Boxes are the main project model: each box is both a page and a folder.
-- Notes and boxes have a many-to-many relationship; linking a note to a box must not duplicate the note.
+- Boxes are the main project model: each box is a container for notes and child boxes.
+- Notes and boxes have a many-to-many relationship through box placements; linking a note to a box must not duplicate the note.
+- Creating a root box or child box must create only the empty box container. Do not automatically create a note or box-home document for a newly created box. Each box view should include quick actions for creating a note or a child box.
 - The default box is named `Unsorted` in the UI and is a visible catch-all/untriaged view, not necessarily a normal user-managed `boxes` row.
 - Boxes may contain child boxes, so box navigation should support a familiar folder/path model inside the main page `/`.
+- Box browsing and box mutations must feel instant. Creating, renaming, moving, attaching notes to, removing notes from, and deleting boxes should update the visible boxes section optimistically before the server confirms the mutation.
+- Opening a note from a box is separate from opening the box. Box clicks must only drill down the boxes section; note clicks may replace the editor with that note. When a box view becomes visible, the app should prefetch full content for the notes visible in that box only, so opening one avoids a visible per-click loading spinner. Do not preload every note in every box on the initial `/` load.
+- Creating a note from inside a box should optimistically add an empty note titled `Undefined`, link it to the current box, replace the current editor document with that note, and autofocus the editor content so the user can start writing immediately. It should not appear in `Unsorted`, because `Unsorted` is the derived view of notes with no box placement.
+- The current editor should expose an `Add to box` action in the top-right document action area. It should open a minimalist popover where the user can place the current note in one or more boxes, remove existing placements, and create a new box without leaving the flow. Creating a box from inside this popover should automatically place the current note in the new box. New boxes created from the popover should default to root boxes unless the user has selected or navigated to a parent box; in that case, pass the parent box id and create the new box as a child.
+- Removing the last box placement from a note should make the note appear in `Unsorted` immediately through the optimistic cache update. The note stays open if it is the active editor document; only its placement state changes.
+- Box deletion must open a confirmation modal before any optimistic deletion is applied. After confirmation, deleting a box deletes its child boxes recursively rather than promoting them to the parent.
+- Deleting a box subtree is a hard delete for now because the current schema has no trash state for boxes or notes. The confirmation modal is the safety layer. Notes that also belong to boxes outside the deleted subtree must be preserved; notes that belong only to the deleted subtree are hard-deleted with it.
 - Product UI copy must stay in English.
 - Search must work across daily notes, boxes, tasks, people, inbox items, and later files.
 - AI is an assistant around the workspace, not the main capture interface.
@@ -67,7 +76,12 @@ Vercel deployment
 - Supabase RLS strategy for MVP: no browser-side DB access; authorization lives in the Next.js server layer using Clerk `orgId`.
 - Initial theme: light-first, subtle off-white/gray background, discreet panels.
 - Daily note date key: resolve "today" on the server with `CERVO_APP_TIME_ZONE`, defaulting to `America/Los_Angeles` for the San Francisco-focused MVP. Do not use the deployment server timezone or browser-provided workspace ids for Phase 1. A future user/workspace timezone preference can replace this centralized default.
+- Daily note persistence: the main page may render a virtual daily note for immediate capture. Persist it only when the user changes its title or content; do not create an empty untouched daily note row on page load.
 - Autosave: mandatory TipTap debounce between 800 and 1200 ms with `saving`, `saved`, and `error` status. No manual save as the primary flow.
+- Memory data flow: use TanStack Query for server-backed boxes, note summaries, full note content, prefetching, optimistic mutations, invalidation, and rollback. Local React state may track the currently active box/drill-down target. Zustand should be reserved for cross-cutting UI state, not server-backed Memory data.
+- Memory mutations should use typed Route Handlers such as `POST /api/boxes`, `PATCH /api/boxes/:boxId`, `DELETE /api/boxes/:boxId`, and note placement endpoints. Do not rely on Server Actions for box and note-placement mutations that need optimistic updates and rollback.
+- `POST /api/boxes` and `PATCH /api/boxes/:boxId` should return the changed canonical box only. TanStack Query should reconcile that box into the cached Memory tree; full snapshot refetching is reserved for unusual conflicts or recovery.
+- `DELETE /api/boxes/:boxId` should return the server-resolved deletion result, including deleted box IDs, deleted document IDs, and preserved document IDs for notes that still belong to boxes outside the deleted subtree.
 - Search: no dedicated search table on day one; start with a SQL function over Postgres full-text search.
 - Calendar, inbox, and people/CRM are mocked in the database for the MVP.
 - Tests: Vitest for logic and Playwright for 2-3 critical flows, but tests are implemented only when explicitly requested.
@@ -565,7 +579,7 @@ updated_at
 ```txt
 id
 workspace_id
-type: daily_note | box_home | note
+type: daily_note | note
 date nullable
 title
 content_json
@@ -578,8 +592,8 @@ updated_at
 
 Justification:
 
-- Daily notes and box home pages use the same editor.
-- A note can belong to several boxes without content duplication.
+- Daily notes and regular notes use the same editor.
+- A note can be placed in several boxes without content duplication.
 - Autosave is implemented once.
 - Search is implemented once.
 - AI context extraction is implemented once.
@@ -594,14 +608,17 @@ name
 slug
 status: active | future | archived
 parent_box_id nullable
-home_document_id
 created_at
 updated_at
 ```
 
 `parent_box_id` supports nested boxes. The main page boxes section should be able to render child boxes, notes/documents, and a breadcrumb or path-like navigation pattern without leaving `/`.
 
-The default catch-all box is labeled `Unsorted` in the UI. It should not be treated as a normal editable project box unless a later implementation decision explicitly requires it. Prefer modeling it as a system/virtual view of untriaged notes, so it cannot be renamed or deleted and does not complicate normal box mutations.
+Creating a box should not create a document row. Any existing `box_home`/`home_document_id` schema support should be treated as legacy or future deep-link infrastructure unless a later product decision reintroduces a dedicated box-home writing surface.
+
+Existing `box_home` documents may remain in the database during the Memory refactor, but the new Memory UI should ignore them and stop creating new ones. Do not add a destructive cleanup yet. After the refactor stabilizes, decide whether to migrate or drop `box_home` and `home_document_id` cleanly.
+
+The default catch-all box is labeled `Unsorted` in the UI. It contains notes with no rows in `document_boxes`, so it should not be treated as a normal editable project box unless a later implementation decision explicitly requires it. Prefer modeling it as a system/virtual view of untriaged notes, so it cannot be renamed or deleted and does not complicate normal box mutations.
 
 ### `document_boxes`
 
@@ -618,7 +635,6 @@ Rules:
 
 - Enforce uniqueness on `(document_id, box_id)`.
 - Use this table for daily notes and regular notes assigned to boxes.
-- Do not use this table for a box's own `home_document_id`; the home document relationship lives on `boxes`.
 - Adding a document to a box creates a relationship row only. It must not copy `documents.content_json` or create a duplicate document row.
 
 ### `tasks`
@@ -676,12 +692,24 @@ created_at
 5. Supabase Postgres + Drizzle schema.
 6. Documents table and daily note auto-creation.
 7. TipTap `DocumentEditor` with autosave.
-8. Boxes with `box_home` documents, `document_boxes` membership, and nested box support.
+8. Boxes with `document_boxes` placement, explicit note creation, and nested box support.
 9. Tasks linked to documents and boxes.
 10. Global search over `content_text`, boxes, tasks, people, and inbox items.
 11. DB-backed mock calendar, inbox, and people panels.
 12. Assistant route with contextual summarize/extract/organize actions.
 13. Demo polish: paste, keyboard shortcuts, command palette, loading states.
+
+## Memory refactor sequence
+
+Before redesigning the full boxes UI, refactor the Memory data flow so box browsing and note opening feel instant:
+
+1. Add typed Route Handlers for box create, update, delete, and note placement mutations.
+2. Wire a TanStack Query provider and Memory cache keys.
+3. Move boxes, note summaries, full note content, visible-note prefetching, optimistic mutations, and rollback into TanStack Query.
+4. Stop auto-creating `box_home` documents when creating boxes.
+5. Implement optimistic box create, rename, move, and delete with confirmation before destructive delete.
+6. Prefetch full content for notes visible in the active box view only.
+7. Build the richer `Add to box` popover and visual polish on top of the fast data layer.
 
 ## Non-goals for MVP
 
