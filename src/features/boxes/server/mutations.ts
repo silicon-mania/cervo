@@ -1,4 +1,4 @@
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, inArray, ne, notInArray } from "drizzle-orm";
 
 import { getDb } from "@/server/db/client";
 import { boxes, documentBoxes, documents } from "@/server/db/schema";
@@ -128,6 +128,120 @@ export async function updateBox(boxId: string, input: UpdateBoxInput): Promise<B
   await db.update(boxes).set(updates).where(eq(boxes.id, existingBox.id));
 
   return getBoxSummaryForWorkspace(existingBox.id, workspace.id);
+}
+
+export type DeleteBoxResult = {
+  deletedBoxIds: string[];
+  deletedDocumentIds: string[];
+  preservedDocumentIds: string[];
+};
+
+export async function deleteBox(boxId: string): Promise<DeleteBoxResult> {
+  const { workspace } = await requireWorkspace();
+  const db = getDb();
+
+  return db.transaction(async (tx) => {
+    const [rootBox] = await tx
+      .select({ id: boxes.id, parentBoxId: boxes.parentBoxId })
+      .from(boxes)
+      .where(and(eq(boxes.id, boxId), eq(boxes.workspaceId, workspace.id)))
+      .limit(1);
+
+    if (!rootBox) {
+      throw new Error("Box not found.");
+    }
+
+    const boxesToDelete = [{ ...rootBox, depth: 0 }];
+    let frontier = [rootBox.id];
+
+    for (let depth = 1; frontier.length > 0; depth += 1) {
+      if (depth > 100) {
+        throw new Error("Box hierarchy is too deep.");
+      }
+
+      const childBoxes = await tx
+        .select({ id: boxes.id, parentBoxId: boxes.parentBoxId })
+        .from(boxes)
+        .where(and(eq(boxes.workspaceId, workspace.id), inArray(boxes.parentBoxId, frontier)));
+
+      if (childBoxes.length === 0) {
+        break;
+      }
+
+      boxesToDelete.push(...childBoxes.map((box) => ({ ...box, depth })));
+      frontier = childBoxes.map((box) => box.id);
+    }
+
+    const deletedBoxIds = boxesToDelete.map((box) => box.id);
+    const linkedDocuments = await tx
+      .select({ documentId: documentBoxes.documentId })
+      .from(documentBoxes)
+      .innerJoin(
+        documents,
+        and(eq(documents.id, documentBoxes.documentId), eq(documents.workspaceId, workspace.id)),
+      )
+      .where(
+        and(
+          eq(documentBoxes.workspaceId, workspace.id),
+          inArray(documentBoxes.boxId, deletedBoxIds),
+          ne(documents.type, "box_home"),
+        ),
+      );
+
+    const candidateDocumentIds = Array.from(
+      new Set(linkedDocuments.map((document) => document.documentId)),
+    );
+    let preservedDocumentIds: string[] = [];
+    let deletedDocumentIds: string[] = [];
+
+    if (candidateDocumentIds.length > 0) {
+      const outsidePlacements = await tx
+        .select({ documentId: documentBoxes.documentId })
+        .from(documentBoxes)
+        .where(
+          and(
+            eq(documentBoxes.workspaceId, workspace.id),
+            inArray(documentBoxes.documentId, candidateDocumentIds),
+            notInArray(documentBoxes.boxId, deletedBoxIds),
+          ),
+        );
+
+      const outsidePlacementDocumentIds = new Set(
+        outsidePlacements.map((placement) => placement.documentId),
+      );
+
+      preservedDocumentIds = candidateDocumentIds.filter((documentId) =>
+        outsidePlacementDocumentIds.has(documentId),
+      );
+      deletedDocumentIds = candidateDocumentIds.filter(
+        (documentId) => !outsidePlacementDocumentIds.has(documentId),
+      );
+
+      if (deletedDocumentIds.length > 0) {
+        await tx
+          .delete(documents)
+          .where(
+            and(
+              eq(documents.workspaceId, workspace.id),
+              inArray(documents.id, deletedDocumentIds),
+              ne(documents.type, "box_home"),
+            ),
+          );
+      }
+    }
+
+    const boxesByDepthDescending = [...boxesToDelete].sort((a, b) => b.depth - a.depth);
+
+    for (const box of boxesByDepthDescending) {
+      await tx.delete(boxes).where(and(eq(boxes.workspaceId, workspace.id), eq(boxes.id, box.id)));
+    }
+
+    return {
+      deletedBoxIds,
+      deletedDocumentIds,
+      preservedDocumentIds,
+    };
+  });
 }
 
 type BoxPlacementMutationInput = BoxPlacementRequestInput & {

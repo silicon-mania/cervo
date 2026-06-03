@@ -2,13 +2,14 @@
 
 import type { JSONContent } from "@tiptap/react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { QueryProvider } from "@/components/providers/query-provider";
 import { AddToBoxPopover } from "@/features/boxes/components/add-to-box-popover";
 import { BoxesExplorer } from "@/features/boxes/components/boxes-explorer";
 import type { RootMemoryData } from "@/features/boxes/server/queries";
 import { TodayEditor } from "@/features/daily-notes/components/today-editor";
+import { getDailyNoteTitle, getDateKeyInTimeZone } from "@/features/daily-notes/date";
 import {
   editorDocumentQueryKey,
   fetchEditorDocument,
@@ -32,10 +33,18 @@ type MainWorkspaceProps = {
   initialMemoryData: RootMemoryData;
 };
 
+const emptyEditorContent: JSONContent = {
+  type: "doc",
+  content: [],
+};
+
 export function MainWorkspace({ initialDocument, initialMemoryData }: MainWorkspaceProps) {
   return (
     <QueryProvider>
-      <MainWorkspaceContent initialDocument={initialDocument} initialMemoryData={initialMemoryData} />
+      <MainWorkspaceContent
+        initialDocument={initialDocument}
+        initialMemoryData={initialMemoryData}
+      />
     </QueryProvider>
   );
 }
@@ -45,6 +54,21 @@ function buildPersistedEditorDocument(document: EditorDocument): ActiveEditorDoc
     ...document,
     clientKey: `document:${document.id}`,
     persistence: "persisted",
+  };
+}
+
+function buildVirtualTodayDocument(): ActiveEditorDocument {
+  const date = getDateKeyInTimeZone();
+
+  return {
+    clientKey: `daily-note:${date}`,
+    id: null,
+    persistence: "virtual_daily",
+    title: getDailyNoteTitle(date),
+    type: "daily_note",
+    date,
+    contentJson: emptyEditorContent,
+    contentText: "",
   };
 }
 
@@ -117,6 +141,13 @@ function MainWorkspaceContent({ initialDocument, initialMemoryData }: MainWorksp
       });
     };
   };
+
+  const handleActiveDocumentDeleted = useCallback(() => {
+    setOpenDocumentError(null);
+    setLoadingDocumentId(null);
+    setActiveDocument(buildVirtualTodayDocument());
+  }, []);
+
   const canPlaceActiveDocument =
     activeDocument.persistence === "persisted" &&
     Boolean(activeDocument.id) &&
@@ -142,8 +173,10 @@ function MainWorkspaceContent({ initialDocument, initialMemoryData }: MainWorksp
 
       <BoxesExplorer
         initialMemoryData={initialMemoryData}
+        activeDocumentId={activeDocument.id}
         openDocumentError={openDocumentError}
         loadingDocumentId={loadingDocumentId}
+        onActiveDocumentDeleted={handleActiveDocumentDeleted}
         onOpenDocument={handleOpenDocument}
         onCreateDocument={handleCreatedDocument}
       />

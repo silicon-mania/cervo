@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { ZodError, z } from "zod";
 
 import { updateBoxSchema } from "@/features/boxes/schemas";
-import { updateBox } from "@/features/boxes/server/mutations";
+import { deleteBox, updateBox } from "@/features/boxes/server/mutations";
 
 const boxParamsSchema = z.object({
   boxId: z.uuid(),
@@ -41,5 +41,24 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     return NextResponse.json({ error: "Unable to update box." }, { status: 500 });
+  }
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  try {
+    const params = boxParamsSchema.parse(await context.params);
+    const result = await deleteBox(params.boxId);
+
+    return NextResponse.json(result);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: errorStatus(error) });
+    }
+
+    return NextResponse.json({ error: "Unable to delete box." }, { status: 500 });
   }
 }

@@ -10,6 +10,7 @@ type BoxCardProps = {
   box: BoxSummary;
   onOpen: (box: BoxSummary) => void;
   onRename: (box: BoxSummary, name: string) => void;
+  onDeleteRequest: (box: BoxSummary) => void;
 };
 
 type UnsortedBoxCardProps = {
@@ -33,12 +34,13 @@ function formatBoxContents(box: BoxSummary) {
   )}`;
 }
 
-export function BoxCard({ box, onOpen, onRename }: BoxCardProps) {
+export function BoxCard({ box, onOpen, onRename, onDeleteRequest }: BoxCardProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [draftName, setDraftName] = useState(box.name);
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const canDelete = box.slug !== "optimistic";
 
   useEffect(() => {
     if (!isRenaming) {
@@ -77,6 +79,11 @@ export function BoxCard({ box, onOpen, onRename }: BoxCardProps) {
     setDraftName(box.name);
     setIsMenuOpen(false);
     setIsRenaming(true);
+  };
+
+  const requestDelete = () => {
+    setIsMenuOpen(false);
+    onDeleteRequest(box);
   };
 
   const saveRename = () => {
@@ -189,6 +196,18 @@ export function BoxCard({ box, onOpen, onRename }: BoxCardProps) {
                 )}>
                 Rename
               </button>
+              {canDelete ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={requestDelete}
+                  className={cn(
+                    "flex h-8 w-full items-center rounded-sm px-2 text-left text-sm text-destructive",
+                    "hover:bg-muted focus-visible:bg-muted focus-visible:outline-none",
+                  )}>
+                  Delete
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>

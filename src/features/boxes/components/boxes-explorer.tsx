@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowUp,
@@ -32,8 +32,10 @@ import {
 
 type BoxesExplorerProps = {
   initialMemoryData: RootMemoryData;
+  activeDocumentId?: string | null;
   openDocumentError?: string | null;
   loadingDocumentId?: string | null;
+  onActiveDocumentDeleted?: () => void;
   onOpenDocument?: (documentId: string) => void;
   onCreateDocument?: (document: EditorDocument) => (() => void) | void;
 };
@@ -101,6 +103,20 @@ type UpdateBoxErrorResponse = {
   error: string;
 };
 
+type DeleteBoxRequest = {
+  box: BoxSummary;
+};
+
+type DeleteBoxResponse = {
+  deletedBoxIds: string[];
+  deletedDocumentIds: string[];
+  preservedDocumentIds: string[];
+};
+
+type DeleteBoxErrorResponse = {
+  error: string;
+};
+
 async function createNoteRequest(input: CreateNoteRequest) {
   const response = await fetch("/api/documents", {
     method: "POST",
@@ -129,6 +145,24 @@ async function updateBoxRequest(input: UpdateBoxRequest) {
 
   if (!response.ok || !payload || "error" in payload) {
     const errorMessage = payload && "error" in payload ? payload.error : "Unable to update box.";
+
+    throw new Error(errorMessage);
+  }
+
+  return payload;
+}
+
+async function deleteBoxRequest(input: DeleteBoxRequest) {
+  const response = await fetch(`/api/boxes/${encodeURIComponent(input.box.id)}`, {
+    method: "DELETE",
+  });
+  const payload = (await response.json().catch(() => null)) as
+    | DeleteBoxResponse
+    | DeleteBoxErrorResponse
+    | null;
+
+  if (!response.ok || !payload || "error" in payload) {
+    const errorMessage = payload && "error" in payload ? payload.error : "Unable to delete box.";
 
     throw new Error(errorMessage);
   }
@@ -171,6 +205,14 @@ function replaceBox(boxes: BoxSummary[], updatedBox: BoxSummary) {
   return sortBoxes(boxes.map((box) => (box.id === updatedBox.id ? updatedBox : box)));
 }
 
+function removeBoxes(boxes: BoxSummary[], boxIds: Set<string>) {
+  return boxes.filter((box) => !boxIds.has(box.id));
+}
+
+function removeDocuments(documents: BoxDocumentSummary[], documentIds: Set<string>) {
+  return documents.filter((document) => !documentIds.has(document.id));
+}
+
 function replaceBoxInMemoryData<TData extends RootMemoryData | BoxMemoryData>(
   currentData: TData | undefined,
   updatedBox: BoxSummary,
@@ -194,6 +236,58 @@ function replaceBoxInMemoryData<TData extends RootMemoryData | BoxMemoryData>(
   };
 }
 
+function removeBoxFromMemoryData<TData extends RootMemoryData | BoxMemoryData>(
+  currentData: TData | undefined,
+  boxId: string,
+) {
+  if (!currentData) {
+    return currentData;
+  }
+
+  if ("boxes" in currentData) {
+    return {
+      ...currentData,
+      boxes: currentData.boxes.filter((box) => box.id !== boxId),
+    };
+  }
+
+  return {
+    ...currentData,
+    childBoxes: currentData.childBoxes.filter((box) => box.id !== boxId),
+  };
+}
+
+function reconcileDeletionInMemoryData<TData extends RootMemoryData | BoxMemoryData>(
+  currentData: TData | undefined,
+  result: DeleteBoxResponse,
+): TData | undefined {
+  if (!currentData) {
+    return currentData;
+  }
+
+  const deletedBoxIds = new Set(result.deletedBoxIds);
+  const deletedDocumentIds = new Set(result.deletedDocumentIds);
+
+  if ("boxes" in currentData) {
+    return {
+      ...currentData,
+      boxes: removeBoxes(currentData.boxes, deletedBoxIds),
+      unsortedDocuments: removeDocuments(currentData.unsortedDocuments, deletedDocumentIds),
+    };
+  }
+
+  if (deletedBoxIds.has(currentData.box.id)) {
+    return undefined;
+  }
+
+  return {
+    ...currentData,
+    path: removeBoxes(currentData.path, deletedBoxIds),
+    childBoxes: removeBoxes(currentData.childBoxes, deletedBoxIds),
+    documents: removeDocuments(currentData.documents, deletedDocumentIds),
+  };
+}
+
 type CreateNoteContext = {
   optimisticDocumentId: string;
   boxId: string | null;
@@ -206,6 +300,70 @@ type UpdateBoxContext = {
   previousMemoryQueries: [readonly unknown[], RootMemoryData | BoxMemoryData | undefined][];
   optimisticBox: BoxSummary;
 };
+
+type DeleteBoxContext = {
+  previousMemoryQueries: [readonly unknown[], RootMemoryData | BoxMemoryData | undefined][];
+};
+
+function DeleteBoxConfirmation({
+  box,
+  onCancel,
+  onConfirm,
+}: {
+  box: BoxSummary;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const titleId = `delete-box-title-${box.id}`;
+  const descriptionId = `delete-box-description-${box.id}`;
+
+  useEffect(() => {
+    cancelButtonRef.current?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onCancel();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onCancel]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 px-4 py-8 backdrop-blur-sm"
+      role="presentation">
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        className="w-full max-w-sm rounded-md border bg-background p-4 shadow-lg">
+        <div className="space-y-2">
+          <h3 id={titleId} className="text-base font-medium">
+            Delete &ldquo;{box.name}&rdquo;?
+          </h3>
+          <p id={descriptionId} className="text-sm leading-6 text-muted-foreground">
+            This will permanently delete this box, its child boxes, and notes placed only inside
+            them. Notes also placed in another box will be kept.
+          </p>
+        </div>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <Button ref={cancelButtonRef} type="button" variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="button" variant="destructive" onClick={onConfirm}>
+            Delete
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function NoteCard({
   document,
@@ -256,8 +414,10 @@ function NoteCard({
 
 export function BoxesExplorer({
   initialMemoryData,
+  activeDocumentId,
   openDocumentError,
   loadingDocumentId,
+  onActiveDocumentDeleted,
   onOpenDocument,
   onCreateDocument,
 }: BoxesExplorerProps) {
@@ -265,6 +425,7 @@ export function BoxesExplorer({
   const [activeTarget, setActiveTarget] = useState<ActiveTarget>({
     type: "root",
   });
+  const [boxPendingDeletion, setBoxPendingDeletion] = useState<BoxSummary | null>(null);
 
   const rootMemoryQuery = useQuery({
     queryKey: rootMemoryQueryKey,
@@ -524,6 +685,61 @@ export function BoxesExplorer({
     },
   });
 
+  const deleteBoxMutation = useMutation<
+    DeleteBoxResponse,
+    Error,
+    DeleteBoxRequest,
+    DeleteBoxContext
+  >({
+    mutationFn: deleteBoxRequest,
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: ["memory"] });
+
+      const previousMemoryQueries = queryClient.getQueriesData<RootMemoryData | BoxMemoryData>({
+        queryKey: ["memory"],
+      });
+
+      queryClient.setQueriesData<RootMemoryData | BoxMemoryData>(
+        { queryKey: ["memory"] },
+        (currentData) => removeBoxFromMemoryData(currentData, input.box.id),
+      );
+
+      return {
+        previousMemoryQueries,
+      };
+    },
+    onSuccess: (result) => {
+      queryClient.setQueriesData<RootMemoryData | BoxMemoryData>(
+        { queryKey: ["memory"] },
+        (currentData) => reconcileDeletionInMemoryData(currentData, result),
+      );
+
+      for (const boxId of result.deletedBoxIds) {
+        queryClient.removeQueries({ queryKey: boxMemoryQueryKey(boxId), exact: true });
+      }
+
+      for (const documentId of result.deletedDocumentIds) {
+        queryClient.removeQueries({
+          queryKey: editorDocumentQueryKey(documentId),
+          exact: true,
+        });
+      }
+
+      if (activeDocumentId && result.deletedDocumentIds.includes(activeDocumentId)) {
+        onActiveDocumentDeleted?.();
+      }
+
+      void queryClient.invalidateQueries({ queryKey: ["memory"] });
+    },
+    onError: (_error, _input, context) => {
+      for (const [queryKey, data] of context?.previousMemoryQueries ?? []) {
+        queryClient.setQueryData(queryKey, data);
+      }
+
+      toast.error("Box could not be deleted. Try again in a moment.");
+    },
+  });
+
   useEffect(() => {
     for (const document of visibleDocuments) {
       queryClient.prefetchQuery({
@@ -550,12 +766,30 @@ export function BoxesExplorer({
     [breadcrumbs],
   );
 
-  const handleBoxRename = useCallback((box: BoxSummary, name: string) => {
-    updateBoxMutation.mutate({
-      boxId: box.id,
-      name,
-    });
-  }, [updateBoxMutation]);
+  const handleBoxRename = useCallback(
+    (box: BoxSummary, name: string) => {
+      updateBoxMutation.mutate({
+        boxId: box.id,
+        name,
+      });
+    },
+    [updateBoxMutation],
+  );
+
+  const handleBoxDeleteRequest = useCallback((box: BoxSummary) => {
+    setBoxPendingDeletion(box);
+  }, []);
+
+  const confirmBoxDeletion = useCallback(() => {
+    const box = boxPendingDeletion;
+
+    if (!box) {
+      return;
+    }
+
+    setBoxPendingDeletion(null);
+    deleteBoxMutation.mutate({ box });
+  }, [boxPendingDeletion, deleteBoxMutation]);
 
   const handleBoxCreated = useCallback((box: BoxSummary) => {
     setActiveTarget((currentTarget) => {
@@ -708,7 +942,13 @@ export function BoxesExplorer({
         ) : null}
 
         {visibleBoxes.map((box) => (
-          <BoxCard key={box.id} box={box} onOpen={openBox} onRename={handleBoxRename} />
+          <BoxCard
+            key={box.id}
+            box={box}
+            onOpen={openBox}
+            onRename={handleBoxRename}
+            onDeleteRequest={handleBoxDeleteRequest}
+          />
         ))}
 
         {visibleDocuments.map((document) => (
@@ -748,6 +988,14 @@ export function BoxesExplorer({
         <div className="mt-5 rounded-md border border-dashed p-4 text-sm text-muted-foreground">
           Empty
         </div>
+      ) : null}
+
+      {boxPendingDeletion ? (
+        <DeleteBoxConfirmation
+          box={boxPendingDeletion}
+          onCancel={() => setBoxPendingDeletion(null)}
+          onConfirm={confirmBoxDeletion}
+        />
       ) : null}
     </section>
   );
