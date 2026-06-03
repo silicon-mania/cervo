@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, LoaderCircle, Package } from "lucide-react";
+import { Check, LoaderCircle, Package, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 import type {
@@ -31,6 +32,21 @@ type PlacementMutationResponse = {
   error?: string;
 };
 
+type CreateBoxRequest = {
+  id: string;
+  name: string;
+  parentBoxId: string | null;
+};
+
+type CreateBoxErrorResponse = {
+  error: string;
+};
+
+type CreateAndPlaceBoxResponse = {
+  box: BoxSummary;
+  document: BoxDocumentSummary;
+};
+
 type PlacementMutationContext = {
   action: "add" | "remove";
   boxId: string;
@@ -39,6 +55,15 @@ type PlacementMutationContext = {
   previousBoxMemory?: BoxMemoryData;
   wasFirstPlacement: boolean;
   wasLastPlacement: boolean;
+};
+
+type CreateAndPlaceBoxContext = {
+  optimisticBox: BoxSummary;
+  parentBoxId: string | null;
+  previousPlacementData?: DocumentBoxPlacementsData;
+  previousRootMemory?: RootMemoryData;
+  previousParentBoxMemory?: BoxMemoryData;
+  wasFirstPlacement: boolean;
 };
 
 const rootMemoryQueryKey = ["memory", "root"] as const;
@@ -84,6 +109,39 @@ async function mutatePlacement(documentId: string, input: PlacementMutationInput
   return payload;
 }
 
+async function createBoxRequest(input: CreateBoxRequest) {
+  const response = await fetch("/api/boxes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const payload = (await response.json().catch(() => null)) as
+    | BoxSummary
+    | CreateBoxErrorResponse
+    | null;
+
+  if (!response.ok || !payload || "error" in payload) {
+    const errorMessage = payload && "error" in payload ? payload.error : "Unable to create box.";
+
+    throw new Error(errorMessage);
+  }
+
+  return payload;
+}
+
+async function createAndPlaceBox(documentId: string, input: CreateBoxRequest) {
+  const box = await createBoxRequest(input);
+  const placement = await mutatePlacement(documentId, {
+    action: "add",
+    boxId: box.id,
+  });
+
+  return {
+    box: placement.box,
+    document: placement.document,
+  };
+}
+
 function sortBoxes(boxes: BoxSummary[]) {
   return [...boxes].sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -96,6 +154,10 @@ function insertBox(boxes: BoxSummary[], box: BoxSummary) {
 
 function removeBox(boxes: BoxSummary[], boxId: string) {
   return boxes.filter((box) => box.id !== boxId);
+}
+
+function replaceBox(boxes: BoxSummary[], optimisticBoxId: string, box: BoxSummary) {
+  return insertBox(removeBox(boxes, optimisticBoxId), box);
 }
 
 function sortDocuments(documents: BoxDocumentSummary[]) {
@@ -160,6 +222,8 @@ function BoxPathLabel({ path }: { path: string[] }) {
 export function AddToBoxPopover({ documentId }: AddToBoxPopoverProps) {
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
+  const [newBoxName, setNewBoxName] = useState("");
+  const [newBoxParentId, setNewBoxParentId] = useState<string | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const queryKey = documentBoxPlacementsQueryKey(documentId);
 
@@ -341,6 +405,188 @@ export function AddToBoxPopover({ documentId }: AddToBoxPopoverProps) {
     },
   });
 
+  const createAndPlaceBoxMutation = useMutation<
+    CreateAndPlaceBoxResponse,
+    Error,
+    CreateBoxRequest,
+    CreateAndPlaceBoxContext
+  >({
+    scope: { id: `document-box-placements:${documentId}` },
+    mutationFn: (input) => createAndPlaceBox(documentId, input),
+    onMutate: async (input) => {
+      const parentBoxQueryKey = input.parentBoxId ? boxMemoryQueryKey(input.parentBoxId) : null;
+
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey }),
+        queryClient.cancelQueries({ queryKey: rootMemoryQueryKey }),
+        ...(parentBoxQueryKey ? [queryClient.cancelQueries({ queryKey: parentBoxQueryKey })] : []),
+      ]);
+
+      const previousPlacementData =
+        queryClient.getQueryData<DocumentBoxPlacementsData>(queryKey);
+      const previousRootMemory = queryClient.getQueryData<RootMemoryData>(rootMemoryQueryKey);
+      const previousParentBoxMemory = parentBoxQueryKey
+        ? queryClient.getQueryData<BoxMemoryData>(parentBoxQueryKey)
+        : undefined;
+      const wasFirstPlacement = Boolean(previousPlacementData?.placements.length === 0);
+      const optimisticBox: BoxSummary = {
+        id: input.id,
+        name: input.name,
+        slug: "optimistic",
+        status: "active",
+        parentBoxId: input.parentBoxId,
+        homeDocumentId: null,
+      };
+
+      queryClient.setQueryData<DocumentBoxPlacementsData>(queryKey, (currentData) => {
+        if (!currentData) {
+          return currentData;
+        }
+
+        return {
+          ...currentData,
+          boxes: insertBox(currentData.boxes, optimisticBox),
+          placements: insertBox(currentData.placements, optimisticBox),
+        };
+      });
+
+      if (!input.parentBoxId) {
+        queryClient.setQueryData<RootMemoryData>(rootMemoryQueryKey, (currentData) => {
+          if (!currentData) {
+            return currentData;
+          }
+
+          return {
+            ...currentData,
+            boxes: insertBox(currentData.boxes, optimisticBox),
+            unsortedDocuments:
+              wasFirstPlacement && previousPlacementData?.document
+                ? removeDocument(currentData.unsortedDocuments, previousPlacementData.document.id)
+                : currentData.unsortedDocuments,
+          };
+        });
+      }
+
+      if (input.parentBoxId && parentBoxQueryKey) {
+        queryClient.setQueryData<BoxMemoryData>(parentBoxQueryKey, (currentData) => {
+          if (!currentData) {
+            return currentData;
+          }
+
+          return {
+            ...currentData,
+            childBoxes: insertBox(currentData.childBoxes, optimisticBox),
+          };
+        });
+      }
+
+      if (input.parentBoxId && wasFirstPlacement && previousPlacementData?.document) {
+        queryClient.setQueryData<RootMemoryData>(rootMemoryQueryKey, (currentData) => {
+          if (!currentData) {
+            return currentData;
+          }
+
+          return {
+            ...currentData,
+            unsortedDocuments: removeDocument(
+              currentData.unsortedDocuments,
+              previousPlacementData.document.id,
+            ),
+          };
+        });
+      }
+
+      return {
+        optimisticBox,
+        parentBoxId: input.parentBoxId,
+        previousPlacementData,
+        previousRootMemory,
+        previousParentBoxMemory,
+        wasFirstPlacement,
+      };
+    },
+    onSuccess: (placement, _input, context) => {
+      queryClient.setQueryData<DocumentBoxPlacementsData>(queryKey, (currentData) => {
+        if (!currentData) {
+          return currentData;
+        }
+
+        return {
+          ...currentData,
+          document: placement.document,
+          boxes: replaceBox(currentData.boxes, context.optimisticBox.id, placement.box),
+          placements: replaceBox(currentData.placements, context.optimisticBox.id, placement.box),
+        };
+      });
+
+      if (!context.parentBoxId) {
+        queryClient.setQueryData<RootMemoryData>(rootMemoryQueryKey, (currentData) => {
+          if (!currentData) {
+            return currentData;
+          }
+
+          return {
+            ...currentData,
+            boxes: replaceBox(currentData.boxes, context.optimisticBox.id, placement.box),
+            unsortedDocuments: context.wasFirstPlacement
+              ? removeDocument(currentData.unsortedDocuments, placement.document.id)
+              : currentData.unsortedDocuments,
+          };
+        });
+        return;
+      }
+
+      queryClient.setQueryData<BoxMemoryData>(
+        boxMemoryQueryKey(context.parentBoxId),
+        (currentData) => {
+          if (!currentData) {
+            return currentData;
+          }
+
+          return {
+            ...currentData,
+            childBoxes: replaceBox(
+              currentData.childBoxes,
+              context.optimisticBox.id,
+              placement.box,
+            ),
+          };
+        },
+      );
+
+      if (context.wasFirstPlacement) {
+        queryClient.setQueryData<RootMemoryData>(rootMemoryQueryKey, (currentData) => {
+          if (!currentData) {
+            return currentData;
+          }
+
+          return {
+            ...currentData,
+            unsortedDocuments: removeDocument(currentData.unsortedDocuments, placement.document.id),
+          };
+        });
+      }
+    },
+    onError: (error, _input, context) => {
+      if (context?.previousPlacementData) {
+        queryClient.setQueryData(queryKey, context.previousPlacementData);
+      }
+
+      if (context?.previousRootMemory) {
+        queryClient.setQueryData(rootMemoryQueryKey, context.previousRootMemory);
+      }
+
+      if (context?.previousParentBoxMemory && context.parentBoxId) {
+        queryClient.setQueryData(
+          boxMemoryQueryKey(context.parentBoxId),
+          context.previousParentBoxMemory,
+        );
+      }
+
+      toast.error(error.message);
+    },
+  });
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -381,11 +627,47 @@ export function AddToBoxPopover({ documentId }: AddToBoxPopoverProps) {
       }))
       .sort((a, b) => a.path.join(" / ").localeCompare(b.path.join(" / ")));
   }, [data?.boxes]);
+  const validNewBoxParentId =
+    newBoxParentId && data?.boxes.some((box) => box.id === newBoxParentId)
+      ? newBoxParentId
+      : null;
+  const selectedParentPath = useMemo(() => {
+    const selectedParent = validNewBoxParentId
+      ? boxes.find(({ box }) => box.id === validNewBoxParentId)
+      : null;
+
+    return selectedParent?.path ?? null;
+  }, [boxes, validNewBoxParentId]);
 
   const togglePlacement = (boxId: string) => {
     placementMutation.mutate({
       action: selectedBoxIds.has(boxId) ? "remove" : "add",
       boxId,
+    });
+  };
+  const trimmedNewBoxName = newBoxName.trim();
+  const canCreateBox =
+    trimmedNewBoxName.length > 0 &&
+    !placementsQuery.isLoading &&
+    !placementsQuery.isError &&
+    !createAndPlaceBoxMutation.isPending;
+
+  const handleCreateBox = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!canCreateBox) {
+      return;
+    }
+
+    const submittedName = trimmedNewBoxName;
+    const submittedParentBoxId = validNewBoxParentId;
+    const submittedId = globalThis.crypto.randomUUID();
+
+    setNewBoxName("");
+    createAndPlaceBoxMutation.mutate({
+      id: submittedId,
+      name: submittedName,
+      parentBoxId: submittedParentBoxId,
     });
   };
 
@@ -414,6 +696,70 @@ export function AddToBoxPopover({ documentId }: AddToBoxPopoverProps) {
           <div className="px-2 py-1.5">
             <p className="text-sm font-medium">Placed in {selectedBoxIds.size} boxes</p>
           </div>
+
+          <form onSubmit={handleCreateBox} className="space-y-2 border-y px-2 py-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <Input
+                name="new-box-name"
+                required
+                maxLength={80}
+                placeholder="New box"
+                aria-label="New box name"
+                value={newBoxName}
+                onChange={(event) => setNewBoxName(event.target.value)}
+                className="h-8 min-w-0 bg-background"
+              />
+              <Button
+                type="submit"
+                variant="outline"
+                size="icon"
+                className="size-8 shrink-0"
+                disabled={!canCreateBox}
+                aria-label="Create box">
+                {createAndPlaceBoxMutation.isPending ? (
+                  <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Plus className="size-4" aria-hidden="true" />
+                )}
+              </Button>
+            </div>
+
+            <div className="flex min-w-0 items-center gap-2 text-xs">
+              <span className="shrink-0 font-medium text-muted-foreground">Parent</span>
+              <button
+                type="button"
+                className={cn(
+                  "rounded-sm px-1.5 py-1 font-medium hover:bg-muted",
+                  !validNewBoxParentId && "bg-muted text-foreground",
+                )}
+                onClick={() => setNewBoxParentId(null)}>
+                Root
+              </button>
+              {selectedParentPath ? <BoxPathLabel path={selectedParentPath} /> : null}
+            </div>
+
+            {boxes.length > 0 ? (
+              <div className="flex max-h-16 flex-wrap gap-1 overflow-y-auto">
+                {boxes.map(({ box, path }) => {
+                  const isParent = validNewBoxParentId === box.id;
+
+                  return (
+                    <button
+                      key={`parent-${box.id}`}
+                      type="button"
+                      aria-label={`Parent ${path.join(" / ")}`}
+                      className={cn(
+                        "rounded-sm border px-1 py-0.5 text-xs hover:bg-muted",
+                        isParent && "border-primary bg-primary/10",
+                      )}
+                      onClick={() => setNewBoxParentId(box.id)}>
+                      <BoxPathLabel path={path} />
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </form>
 
           <div className="mt-1 max-h-72 overflow-y-auto rounded-md border border-dashed">
             {placementsQuery.isLoading ? (
