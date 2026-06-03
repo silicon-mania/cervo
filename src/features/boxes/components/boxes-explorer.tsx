@@ -92,6 +92,15 @@ type CreateNoteResponse = {
   error?: string;
 };
 
+type UpdateBoxRequest = {
+  boxId: string;
+  name: string;
+};
+
+type UpdateBoxErrorResponse = {
+  error: string;
+};
+
 async function createNoteRequest(input: CreateNoteRequest) {
   const response = await fetch("/api/documents", {
     method: "POST",
@@ -102,6 +111,26 @@ async function createNoteRequest(input: CreateNoteRequest) {
 
   if (!response.ok || !payload?.document || !payload.summary) {
     throw new Error(payload?.error ?? "Unable to create note.");
+  }
+
+  return payload;
+}
+
+async function updateBoxRequest(input: UpdateBoxRequest) {
+  const response = await fetch(`/api/boxes/${encodeURIComponent(input.boxId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: input.name }),
+  });
+  const payload = (await response.json().catch(() => null)) as
+    | BoxSummary
+    | UpdateBoxErrorResponse
+    | null;
+
+  if (!response.ok || !payload || "error" in payload) {
+    const errorMessage = payload && "error" in payload ? payload.error : "Unable to update box.";
+
+    throw new Error(errorMessage);
   }
 
   return payload;
@@ -131,12 +160,51 @@ function replaceDocument(
   );
 }
 
+function renameBox(box: BoxSummary, name: string): BoxSummary {
+  return {
+    ...box,
+    name,
+  };
+}
+
+function replaceBox(boxes: BoxSummary[], updatedBox: BoxSummary) {
+  return sortBoxes(boxes.map((box) => (box.id === updatedBox.id ? updatedBox : box)));
+}
+
+function replaceBoxInMemoryData<TData extends RootMemoryData | BoxMemoryData>(
+  currentData: TData | undefined,
+  updatedBox: BoxSummary,
+) {
+  if (!currentData) {
+    return currentData;
+  }
+
+  if ("boxes" in currentData) {
+    return {
+      ...currentData,
+      boxes: replaceBox(currentData.boxes, updatedBox),
+    };
+  }
+
+  return {
+    ...currentData,
+    box: currentData.box.id === updatedBox.id ? updatedBox : currentData.box,
+    path: currentData.path.map((box) => (box.id === updatedBox.id ? updatedBox : box)),
+    childBoxes: replaceBox(currentData.childBoxes, updatedBox),
+  };
+}
+
 type CreateNoteContext = {
   optimisticDocumentId: string;
   boxId: string | null;
   previousRootMemory?: RootMemoryData;
   previousBoxMemory?: BoxMemoryData;
   restoreActiveDocument?: () => void;
+};
+
+type UpdateBoxContext = {
+  previousMemoryQueries: [readonly unknown[], RootMemoryData | BoxMemoryData | undefined][];
+  optimisticBox: BoxSummary;
 };
 
 function NoteCard({
@@ -385,6 +453,77 @@ export function BoxesExplorer({
     },
   });
 
+  const updateBoxMutation = useMutation<BoxSummary, Error, UpdateBoxRequest, UpdateBoxContext>({
+    mutationFn: updateBoxRequest,
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: ["memory"] });
+
+      const previousMemoryQueries = queryClient.getQueriesData<RootMemoryData | BoxMemoryData>({
+        queryKey: ["memory"],
+      });
+      let optimisticBox: BoxSummary | null = null;
+
+      for (const [, data] of previousMemoryQueries) {
+        if (!data) {
+          continue;
+        }
+
+        if ("boxes" in data) {
+          optimisticBox = data.boxes.find((box) => box.id === input.boxId) ?? optimisticBox;
+          continue;
+        }
+
+        if (data.box.id === input.boxId) {
+          optimisticBox = data.box;
+          continue;
+        }
+
+        optimisticBox =
+          data.path.find((box) => box.id === input.boxId) ??
+          data.childBoxes.find((box) => box.id === input.boxId) ??
+          optimisticBox;
+      }
+
+      if (!optimisticBox) {
+        optimisticBox = {
+          id: input.boxId,
+          name: input.name,
+          slug: "optimistic",
+          status: "active",
+          parentBoxId: null,
+          homeDocumentId: null,
+          directNoteCount: 0,
+          directBoxCount: 0,
+        };
+      }
+
+      const renamedBox = renameBox(optimisticBox, input.name);
+
+      queryClient.setQueriesData<RootMemoryData | BoxMemoryData>(
+        { queryKey: ["memory"] },
+        (currentData) => replaceBoxInMemoryData(currentData, renamedBox),
+      );
+
+      return {
+        previousMemoryQueries,
+        optimisticBox: renamedBox,
+      };
+    },
+    onSuccess: (box) => {
+      queryClient.setQueriesData<RootMemoryData | BoxMemoryData>(
+        { queryKey: ["memory"] },
+        (currentData) => replaceBoxInMemoryData(currentData, box),
+      );
+    },
+    onError: (error, _input, context) => {
+      for (const [queryKey, data] of context?.previousMemoryQueries ?? []) {
+        queryClient.setQueryData(queryKey, data);
+      }
+
+      toast.error(error.message);
+    },
+  });
+
   useEffect(() => {
     for (const document of visibleDocuments) {
       queryClient.prefetchQuery({
@@ -410,6 +549,13 @@ export function BoxesExplorer({
     },
     [breadcrumbs],
   );
+
+  const handleBoxRename = useCallback((box: BoxSummary, name: string) => {
+    updateBoxMutation.mutate({
+      boxId: box.id,
+      name,
+    });
+  }, [updateBoxMutation]);
 
   const handleBoxCreated = useCallback((box: BoxSummary) => {
     setActiveTarget((currentTarget) => {
@@ -562,7 +708,7 @@ export function BoxesExplorer({
         ) : null}
 
         {visibleBoxes.map((box) => (
-          <BoxCard key={box.id} box={box} onOpen={openBox} />
+          <BoxCard key={box.id} box={box} onOpen={openBox} onRename={handleBoxRename} />
         ))}
 
         {visibleDocuments.map((document) => (

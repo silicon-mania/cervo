@@ -9,6 +9,8 @@ import {
   createBoxSchema,
   type BoxPlacementRequestInput,
   type CreateBoxInput,
+  type UpdateBoxInput,
+  updateBoxSchema,
 } from "../schemas";
 import { getBoxSummaryForWorkspace, type BoxDocumentSummary, type BoxSummary } from "./queries";
 
@@ -98,6 +100,34 @@ export async function createBox(input: CreateBoxInput): Promise<BoxSummary> {
   }
 
   return getBoxSummaryForWorkspace(box.id, workspace.id);
+}
+
+export async function updateBox(boxId: string, input: UpdateBoxInput): Promise<BoxSummary> {
+  const payload = updateBoxSchema.parse(input);
+  const { workspace } = await requireWorkspace();
+  const db = getDb();
+
+  const [existingBox] = await db
+    .select({ id: boxes.id })
+    .from(boxes)
+    .where(and(eq(boxes.id, boxId), eq(boxes.workspaceId, workspace.id)))
+    .limit(1);
+
+  if (!existingBox) {
+    throw new Error("Box not found.");
+  }
+
+  const updates: Partial<typeof boxes.$inferInsert> = {
+    updatedAt: new Date(),
+  };
+
+  if (payload.name) {
+    updates.name = payload.name;
+  }
+
+  await db.update(boxes).set(updates).where(eq(boxes.id, existingBox.id));
+
+  return getBoxSummaryForWorkspace(existingBox.id, workspace.id);
 }
 
 type BoxPlacementMutationInput = BoxPlacementRequestInput & {
