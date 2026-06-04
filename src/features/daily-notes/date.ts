@@ -1,4 +1,4 @@
-export const DEFAULT_APP_TIME_ZONE = "America/Los_Angeles";
+const DEFAULT_APP_TIME_ZONE = "America/Los_Angeles";
 
 function getDatePart(parts: Intl.DateTimeFormatPart[], type: string) {
   const part = parts.find((item) => item.type === type);

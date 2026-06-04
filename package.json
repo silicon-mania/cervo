@@ -55,5 +55,8 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.8"
+  },
+  "knip": {
+    "ignore": ["extension/popup.css", "extension/popup.js"]
   }
 }
