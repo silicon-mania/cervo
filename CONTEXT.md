@@ -20,6 +20,10 @@ _Avoid_: Recursive contents, total contents
 A document that can be placed in a box or left unsorted.
 _Avoid_: File
 
+**Attachment**:
+Uploaded material owned by a note, box, task, or person.
+_Avoid_: Inline file, asset, upload
+
 **Box Placement**:
 The relationship that places one note inside one box without duplicating the note.
 _Avoid_: Copy, link, membership
@@ -27,6 +31,26 @@ _Avoid_: Copy, link, membership
 **Daily Note**:
 A note for one calendar day that appears by default in the editor when the user has not chosen another note. There can be only one daily note per day, and it can be replaced by a new blank daily note if the editor needs a default note after deletion.
 _Avoid_: Journal entry, separate document type
+
+**Current Daily Note**:
+The daily note for today according to Cervo's app timezone.
+_Avoid_: Local daily note, browser-date note
+
+**Capture**:
+A quick act of sending text, links, images, or other material into Cervo without first deciding where it belongs.
+_Avoid_: Save, clip, import
+
+**Capture Draft**:
+The unsaved material currently being composed in the capture area before the user appends it.
+_Avoid_: Temporary note, extension note, saved draft
+
+**Capture Area**:
+The lightweight extension surface where a user composes a capture draft before appending it.
+_Avoid_: Text area, editor, form
+
+**Append**:
+The deliberate action that adds a capture to the end of the user's daily note.
+_Avoid_: Autosave, sync, submit
 
 **Unsorted**:
 The collection of notes that are not placed in any box.

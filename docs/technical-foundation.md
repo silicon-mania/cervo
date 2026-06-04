@@ -524,6 +524,10 @@ Rules:
 - Features expose public imports through `index.ts`.
 - Avoid importing another feature's internals.
 - Shared logic moves up to `components`, `server`, `hooks`, or `lib`.
+- Browser extension code should live in a separate app or folder inside this repository, not mixed into Next.js app routes and components.
+- The browser extension should reuse Cervo design tokens and visual language where practical, but keep its popup UI standalone rather than importing heavy app shell code.
+- The browser extension append endpoint can use multipart form data for v1 so text and image files are submitted together. The implementation should preserve current Cervo app behavior, but does not need to carry legacy compatibility for users that do not exist yet.
+- Extension image uploads should go through server-side Cervo storage helpers backed by Supabase Storage. Extensions should not upload directly to Supabase.
 
 ## Data model direction
 
