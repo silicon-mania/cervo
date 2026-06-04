@@ -146,10 +146,12 @@ function createStorage(initialValues: Record<string, string> = {}) {
 
 function createPopup({
   authenticated,
+  appendFetch = async () => ({ ok: true }),
   localDraft = "",
   localImages = [],
 }: {
   authenticated: boolean;
+  appendFetch?: (url: string, init?: RequestInit) => Promise<{ ok: boolean }>;
   localDraft?: string;
   localImages?: Array<Record<string, unknown>>;
 }) {
@@ -159,6 +161,7 @@ function createPopup({
   const imageFileInput = new TestElement();
   const imagePreviewList = new TestElement();
   const openCervoButton = new TestElement();
+  const recoveryButton = new TestElement();
   const statusMessage = new TestElement();
   const storage = createStorage({
     cervoCaptureDraftText: localDraft,
@@ -166,14 +169,14 @@ function createPopup({
   });
   const windowListeners = new Map<string, Listener[]>();
   const open = vi.fn();
-  const fetch = vi.fn(async (url: string) => {
+  const fetch = vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith("/api/capture/session")) {
       return {
         json: async () => ({ authenticated }),
       };
     }
 
-    return { ok: true };
+    return appendFetch(url, init);
   });
   const queryTargets = new Map<string, TestElement>([
     ["#capture-text", captureArea],
@@ -182,6 +185,7 @@ function createPopup({
     ["#image-file-input", imageFileInput],
     ["#image-preview-list", imagePreviewList],
     ["#open-cervo-button", openCervoButton],
+    ["#recovery-button", recoveryButton],
     ["#capture-status", statusMessage],
   ]);
   const script = readFileSync(
@@ -222,6 +226,7 @@ function createPopup({
     imagePreviewList,
     open,
     openCervoButton,
+    recoveryButton,
     statusMessage,
     storage,
     async load() {
@@ -236,6 +241,15 @@ function createPopup({
 async function waitForDraftWork() {
   await new Promise((resolve) => setTimeout(resolve, 0));
   await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function createDeferred<T>() {
+  let resolve: (value: T) => void = () => {};
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+
+  return { promise, resolve };
 }
 
 describe("extension popup local draft behavior", () => {
@@ -406,6 +420,121 @@ describe("extension popup local draft behavior", () => {
     expect(popup.imagePreviewList.children).toHaveLength(0);
     expect(popup.storage.values.get("cervoCaptureDraftText")).toBe("");
     expect(JSON.parse(popup.storage.values.get("cervoCaptureDraftImages") || "[]")).toEqual([]);
+    expect(popup.statusMessage.textContent).toBe("Appended.");
+  });
+
+  it("restores a failed optimistic append when the draft is still empty", async () => {
+    const appendFetch = vi.fn(async () => ({ ok: false }));
+    const popup = createPopup({
+      authenticated: true,
+      appendFetch,
+      localDraft: "Restore me",
+    });
+
+    await popup.load();
+    await popup.appendButton.dispatchEvent("click");
+
+    expect(popup.captureArea.value).toBe("");
+    expect(popup.storage.values.get("cervoCaptureDraftText")).toBe("");
+    expect(popup.statusMessage.textContent).toBe("Appended.");
+
+    await waitForDraftWork();
+
+    expect(appendFetch).toHaveBeenCalledTimes(1);
+    expect(popup.captureArea.value).toBe("Restore me");
+    expect(popup.storage.values.get("cervoCaptureDraftText")).toBe("Restore me");
+    expect(popup.statusMessage.textContent).toBe("Unable to append.");
+    expect(popup.recoveryButton.hidden).toBe(true);
+  });
+
+  it("keeps an active newer draft and exposes deliberate retry after append failure", async () => {
+    const firstAppend = createDeferred<{ ok: boolean }>();
+    const secondAppend = createDeferred<{ ok: boolean }>();
+    const appendBodies: FormData[] = [];
+    let appendCount = 0;
+    const appendFetch = vi.fn((_url: string, init?: RequestInit) => {
+      appendBodies.push(init?.body as FormData);
+      appendCount += 1;
+      return appendCount === 1 ? firstAppend.promise : secondAppend.promise;
+    });
+    const popup = createPopup({
+      authenticated: true,
+      appendFetch,
+      localDraft: "Failed snapshot",
+    });
+
+    await popup.load();
+    await popup.appendButton.dispatchEvent("click");
+    await waitForDraftWork();
+
+    expect(popup.captureArea.value).toBe("");
+    expect(popup.statusMessage.textContent).toBe("Appended.");
+
+    popup.captureArea.value = "Newer draft";
+    await popup.captureArea.dispatchEvent("input");
+
+    firstAppend.resolve({ ok: false });
+    await waitForDraftWork();
+
+    expect(appendFetch).toHaveBeenCalledTimes(1);
+    expect(popup.captureArea.value).toBe("Newer draft");
+    expect(popup.storage.values.get("cervoCaptureDraftText")).toBe("Newer draft");
+    expect(popup.statusMessage.textContent).toBe("Append failed. Retry when ready.");
+    expect(popup.recoveryButton.hidden).toBe(false);
+
+    await popup.recoveryButton.dispatchEvent("click");
+    await waitForDraftWork();
+
+    const retryBody = appendBodies[1];
+
+    expect(appendFetch).toHaveBeenCalledTimes(2);
+    expect(retryBody?.get("text")).toBe("Failed snapshot");
+    expect(popup.captureArea.value).toBe("Newer draft");
+
+    secondAppend.resolve({ ok: true });
+    await waitForDraftWork();
+
+    expect(popup.recoveryButton.hidden).toBe(true);
+    expect(popup.statusMessage.textContent).toBe("Failed append retried.");
+  });
+
+  it("preserves rapid append order with the pending request chain", async () => {
+    const firstAppend = createDeferred<{ ok: boolean }>();
+    const secondAppend = createDeferred<{ ok: boolean }>();
+    const appendTexts: string[] = [];
+    const appendFetch = vi.fn((_url: string, init?: RequestInit) => {
+      const body = init?.body as FormData;
+
+      appendTexts.push(String(body.get("text")));
+
+      return appendTexts.length === 1 ? firstAppend.promise : secondAppend.promise;
+    });
+    const popup = createPopup({
+      authenticated: true,
+      appendFetch,
+      localDraft: "First",
+    });
+
+    await popup.load();
+    await popup.appendButton.dispatchEvent("click");
+    await waitForDraftWork();
+
+    popup.captureArea.value = "Second";
+    await popup.captureArea.dispatchEvent("input");
+    await popup.appendButton.dispatchEvent("click");
+    await waitForDraftWork();
+
+    expect(appendTexts).toEqual(["First"]);
+
+    firstAppend.resolve({ ok: true });
+    await waitForDraftWork();
+
+    expect(appendTexts).toEqual(["First", "Second"]);
+
+    secondAppend.resolve({ ok: true });
+    await waitForDraftWork();
+
+    expect(popup.captureArea.value).toBe("");
     expect(popup.statusMessage.textContent).toBe("Appended.");
   });
 

@@ -68,7 +68,7 @@ body {
 
 .capture-footer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
 }
@@ -168,6 +168,7 @@ body {
 }
 
 .append-button,
+.recovery-button,
 .secondary-button {
   height: 32px;
   border-radius: 8px;
@@ -213,4 +214,18 @@ body {
 
 .secondary-button:hover {
   background: var(--surface);
+}
+
+.recovery-button {
+  border: 1px solid var(--primary);
+  background: var(--background);
+  color: var(--primary);
+}
+
+.recovery-button:hover {
+  background: color-mix(in srgb, var(--primary) 8%, var(--background));
+}
+
+.recovery-button[hidden] {
+  display: none;
 }

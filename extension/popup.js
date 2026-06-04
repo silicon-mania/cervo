@@ -10,11 +10,13 @@ const imageFileButton = document.querySelector("#image-file-button");
 const imageFileInput = document.querySelector("#image-file-input");
 const imagePreviewList = document.querySelector("#image-preview-list");
 const openCervoButton = document.querySelector("#open-cervo-button");
+const recoveryButton = document.querySelector("#recovery-button");
 const statusMessage = document.querySelector("#capture-status");
 
-let isAppending = false;
 let isAuthenticated = false;
 let imageDrafts = [];
+let appendChain = Promise.resolve();
+let recoverableAppend = null;
 
 function getCervoBaseUrl() {
   const configuredUrl = localStorage.getItem("cervoBaseUrl");
@@ -24,6 +26,10 @@ function getCervoBaseUrl() {
 
 function setStatus(message) {
   statusMessage.textContent = message;
+}
+
+function getSignedInIdleStatus() {
+  return recoverableAppend ? "Append failed. Retry when ready." : "";
 }
 
 function getSignInUrl() {
@@ -64,7 +70,8 @@ function restoreLocalDraft() {
 
 function syncActionState() {
   appendButton.textContent = isAuthenticated ? "Append" : "Sign in";
-  appendButton.disabled = isAppending || (isAuthenticated && !hasCaptureDraft());
+  appendButton.disabled = isAuthenticated && !hasCaptureDraft();
+  recoveryButton.hidden = !recoverableAppend;
 }
 
 function insertPlainText(text) {
@@ -134,6 +141,101 @@ function dataUrlToBlob(dataUrl, fallbackType) {
   return new Blob([bytes], { type: mimeType });
 }
 
+function cloneImageDraft(image) {
+  return { ...image };
+}
+
+function getCaptureSnapshot() {
+  return {
+    captureId: crypto.randomUUID(),
+    text: captureArea.value.trimEnd(),
+    images: imageDrafts.map(cloneImageDraft),
+  };
+}
+
+function restoreCaptureSnapshot(snapshot) {
+  captureArea.value = snapshot.text;
+  imageDrafts = snapshot.images.map(cloneImageDraft);
+  saveLocalDraft();
+  renderImageDrafts();
+  syncActionState();
+}
+
+function clearCaptureDraft() {
+  captureArea.value = "";
+  imageDrafts = [];
+  saveLocalDraft();
+  renderImageDrafts();
+  syncActionState();
+}
+
+function getAppendFormData(snapshot) {
+  const formData = new FormData();
+
+  formData.set("captureId", snapshot.captureId);
+  formData.set("text", snapshot.text);
+
+  for (const image of snapshot.images) {
+    formData.append("images", dataUrlToBlob(image.dataUrl, image.type), image.name);
+  }
+
+  return formData;
+}
+
+async function postAppendSnapshot(snapshot) {
+  const response = await fetch(`${getCervoBaseUrl()}/api/capture/append`, {
+    method: "POST",
+    body: getAppendFormData(snapshot),
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to append.");
+  }
+}
+
+function clearRecoverableAppend(snapshot) {
+  if (!snapshot || recoverableAppend === snapshot) {
+    recoverableAppend = null;
+    syncActionState();
+  }
+}
+
+function handleAppendFailure(snapshot, error) {
+  if (!hasCaptureDraft()) {
+    clearRecoverableAppend(snapshot);
+    restoreCaptureSnapshot(snapshot);
+    setStatus(error instanceof Error ? error.message : "Unable to append.");
+    captureArea.focus();
+    return;
+  }
+
+  recoverableAppend = snapshot;
+  syncActionState();
+  setStatus("Append failed. Retry when ready.");
+  captureArea.focus();
+}
+
+function queueAppendSnapshot(snapshot, { recoveryRetry = false } = {}) {
+  const appendWork = appendChain.then(() => postAppendSnapshot(snapshot));
+
+  appendChain = appendWork.catch(() => {});
+
+  void appendWork
+    .then(() => {
+      if (recoveryRetry) {
+        setStatus("Failed append retried.");
+      }
+
+      clearRecoverableAppend(snapshot);
+    })
+    .catch((error) => handleAppendFailure(snapshot, error))
+    .finally(() => {
+      syncActionState();
+      captureArea.focus();
+    });
+}
+
 async function addImageFiles(files) {
   const acceptedFiles = [];
 
@@ -169,7 +271,7 @@ async function addImageFiles(files) {
   saveLocalDraft();
   renderImageDrafts();
   syncActionState();
-  setStatus(isAuthenticated ? "" : "Stored locally until Cervo is connected.");
+  setStatus(isAuthenticated ? getSignedInIdleStatus() : "Stored locally until Cervo is connected.");
 }
 
 function removeImageDraft(imageId) {
@@ -177,7 +279,7 @@ function removeImageDraft(imageId) {
   saveLocalDraft();
   renderImageDrafts();
   syncActionState();
-  setStatus(isAuthenticated ? "" : "Stored locally until Cervo is connected.");
+  setStatus(isAuthenticated ? getSignedInIdleStatus() : "Stored locally until Cervo is connected.");
   captureArea.focus();
 }
 
@@ -213,7 +315,7 @@ async function refreshSession() {
     const payload = await response.json();
 
     isAuthenticated = Boolean(payload.authenticated);
-    setStatus(isAuthenticated ? "" : "Stored locally until Cervo is connected.");
+    setStatus(isAuthenticated ? getSignedInIdleStatus() : "Stored locally until Cervo is connected.");
   } catch {
     isAuthenticated = false;
     setStatus("Stored locally until Cervo is connected.");
@@ -223,10 +325,6 @@ async function refreshSession() {
 }
 
 async function appendCapture() {
-  if (isAppending) {
-    return;
-  }
-
   if (!isAuthenticated) {
     await refreshSession();
   }
@@ -241,48 +339,12 @@ async function appendCapture() {
     return;
   }
 
-  const textSnapshot = captureArea.value.trimEnd();
-  const imageSnapshot = [...imageDrafts];
-  const formData = new FormData();
+  const snapshot = getCaptureSnapshot();
 
-  formData.set("captureId", crypto.randomUUID());
-  formData.set("text", textSnapshot);
-
-  for (const image of imageSnapshot) {
-    formData.append("images", dataUrlToBlob(image.dataUrl, image.type), image.name);
-  }
-
-  isAppending = true;
-  captureArea.value = "";
-  imageDrafts = [];
-  saveLocalDraft();
-  renderImageDrafts();
-  syncActionState();
-  setStatus("Appending...");
-
-  try {
-    const response = await fetch(`${getCervoBaseUrl()}/api/capture/append`, {
-      method: "POST",
-      body: formData,
-      credentials: "include",
-    });
-
-    if (!response.ok) {
-      throw new Error("Unable to append.");
-    }
-
-    setStatus("Appended.");
-  } catch (error) {
-    captureArea.value = textSnapshot;
-    imageDrafts = imageSnapshot;
-    saveLocalDraft();
-    renderImageDrafts();
-    setStatus(error instanceof Error ? error.message : "Unable to append.");
-  } finally {
-    isAppending = false;
-    syncActionState();
-    captureArea.focus();
-  }
+  clearCaptureDraft();
+  setStatus("Appended.");
+  captureArea.focus();
+  queueAppendSnapshot(snapshot);
 }
 
 function openCervo() {
@@ -292,7 +354,7 @@ function openCervo() {
 captureArea.addEventListener("input", () => {
   saveLocalDraft();
   syncActionState();
-  setStatus(isAuthenticated ? "" : "Stored locally until Cervo is connected.");
+  setStatus(isAuthenticated ? getSignedInIdleStatus() : "Stored locally until Cervo is connected.");
 });
 
 captureArea.addEventListener("paste", (event) => {
@@ -349,6 +411,17 @@ imageFileInput.addEventListener("change", () => {
 });
 
 openCervoButton.addEventListener("click", openCervo);
+
+recoveryButton.addEventListener("click", () => {
+  if (!recoverableAppend) {
+    return;
+  }
+
+  const snapshot = recoverableAppend;
+
+  setStatus("Retrying failed append...");
+  queueAppendSnapshot(snapshot, { recoveryRetry: true });
+});
 
 window.addEventListener("DOMContentLoaded", () => {
   restoreLocalDraft();
