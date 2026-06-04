@@ -216,10 +216,16 @@ function handleAppendFailure(snapshot, error) {
   captureArea.focus();
 }
 
-function queueAppendSnapshot(snapshot, { recoveryRetry = false } = {}) {
+function enqueueAppendSnapshot(snapshot) {
   const appendWork = appendChain.then(() => postAppendSnapshot(snapshot));
 
   appendChain = appendWork.catch(() => {});
+
+  return appendWork;
+}
+
+function queueAppendSnapshot(snapshot, { recoveryRetry = false } = {}) {
+  const appendWork = enqueueAppendSnapshot(snapshot);
 
   void appendWork
     .then(() => {
@@ -347,8 +353,39 @@ async function appendCapture() {
   queueAppendSnapshot(snapshot);
 }
 
-function openCervo() {
-  window.open(isAuthenticated ? getAppUrl() : getSignInUrl(), "_blank", "noopener");
+async function openCervo() {
+  if (!isAuthenticated) {
+    await refreshSession();
+  }
+
+  if (!isAuthenticated) {
+    window.open(getSignInUrl(), "_blank", "noopener");
+    captureArea.focus();
+    return;
+  }
+
+  if (!hasCaptureDraft()) {
+    window.open(getAppUrl(), "_blank", "noopener");
+    captureArea.focus();
+    return;
+  }
+
+  const snapshot = getCaptureSnapshot();
+
+  clearCaptureDraft();
+  setStatus("Opening Cervo...");
+  captureArea.focus();
+
+  try {
+    await enqueueAppendSnapshot(snapshot);
+    clearRecoverableAppend(snapshot);
+    window.open(getAppUrl(), "_blank", "noopener");
+  } catch (error) {
+    handleAppendFailure(snapshot, error);
+  } finally {
+    syncActionState();
+    captureArea.focus();
+  }
 }
 
 captureArea.addEventListener("input", () => {

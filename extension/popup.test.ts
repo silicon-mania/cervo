@@ -338,6 +338,72 @@ describe("extension popup local draft behavior", () => {
     expect(popup.fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps Open Cervo available and opens the app directly for authenticated empty drafts", async () => {
+    const popup = createPopup({ authenticated: true });
+
+    await popup.load();
+    await popup.openCervoButton.dispatchEvent("click");
+
+    expect(popup.openCervoButton.hidden).toBe(false);
+    expect(popup.openCervoButton.disabled).toBe(false);
+    expect(popup.fetch).toHaveBeenCalledTimes(1);
+    expect(popup.open).toHaveBeenCalledWith("http://localhost:3000/", "_blank", "noopener");
+  });
+
+  it("appends an authenticated draft before opening Cervo", async () => {
+    const append = createDeferred<{ ok: boolean }>();
+    let appendBody: FormData | undefined;
+    const appendFetch = vi.fn((_url: string, init?: RequestInit) => {
+      appendBody = init?.body as FormData;
+
+      return append.promise;
+    });
+    const popup = createPopup({
+      authenticated: true,
+      appendFetch,
+      localDraft: "Open me after append",
+    });
+
+    await popup.load();
+    const openWork = popup.openCervoButton.dispatchEvent("click");
+    await waitForDraftWork();
+
+    expect(appendFetch).toHaveBeenCalledTimes(1);
+    expect(appendBody?.get("captureId")).toBe("capture-id");
+    expect(appendBody?.get("text")).toBe("Open me after append");
+    expect(popup.captureArea.value).toBe("");
+    expect(popup.storage.values.get("cervoCaptureDraftText")).toBe("");
+    expect(popup.statusMessage.textContent).toBe("Opening Cervo...");
+    expect(popup.open).not.toHaveBeenCalled();
+
+    append.resolve({ ok: true });
+    await openWork;
+    await waitForDraftWork();
+
+    expect(popup.open).toHaveBeenCalledWith("http://localhost:3000/", "_blank", "noopener");
+    expect(popup.captureArea.value).toBe("");
+  });
+
+  it("restores an Open Cervo capture when append completion fails", async () => {
+    const appendFetch = vi.fn(async () => ({ ok: false }));
+    const popup = createPopup({
+      authenticated: true,
+      appendFetch,
+      localDraft: "Try later",
+    });
+
+    await popup.load();
+    await popup.openCervoButton.dispatchEvent("click");
+    await waitForDraftWork();
+
+    expect(appendFetch).toHaveBeenCalledTimes(1);
+    expect(popup.open).not.toHaveBeenCalled();
+    expect(popup.captureArea.value).toBe("Try later");
+    expect(popup.storage.values.get("cervoCaptureDraftText")).toBe("Try later");
+    expect(popup.statusMessage.textContent).toBe("Unable to append.");
+    expect(popup.recoveryButton.hidden).toBe(true);
+  });
+
   it("adds pasted clipboard images to the local draft", async () => {
     const image = new TestFile({ name: "clipboard.png", type: "image/png" });
     const popup = createPopup({ authenticated: false });
