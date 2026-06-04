@@ -14,7 +14,13 @@ class TestEvent {
   key?: string;
   metaKey?: boolean;
   ctrlKey?: boolean;
-  clipboardData?: { getData: (type: string) => string | undefined };
+  clipboardData?: {
+    getData: (type: string) => string | undefined;
+    items?: Array<{
+      kind: string;
+      getAsFile: () => TestFile | null;
+    }>;
+  };
 
   constructor(type: string, options: { bubbles?: boolean } = {}) {
     this.type = type;
@@ -28,11 +34,19 @@ class TestEvent {
 
 class TestElement {
   disabled = false;
+  hidden = false;
   textContent = "";
   value = "";
   selectionStart = 0;
   selectionEnd = 0;
   focused = false;
+  className = "";
+  type = "";
+  src = "";
+  alt = "";
+  files: TestFile[] = [];
+  readonly children: TestElement[] = [];
+  readonly attributes = new Map<string, string>();
   private readonly listeners = new Map<string, Listener[]>();
 
   addEventListener(type: string, listener: Listener) {
@@ -54,10 +68,67 @@ class TestElement {
     this.focused = true;
   }
 
+  click() {
+    void this.dispatchEvent("click");
+  }
+
   setRangeText(text: string, start: number, end: number) {
     this.value = `${this.value.slice(0, start)}${text}${this.value.slice(end)}`;
     this.selectionStart = start + text.length;
     this.selectionEnd = this.selectionStart;
+  }
+
+  setAttribute(name: string, value: string) {
+    this.attributes.set(name, value);
+  }
+
+  append(...elements: TestElement[]) {
+    this.children.push(...elements);
+  }
+
+  replaceChildren(...elements: TestElement[]) {
+    this.children.splice(0, this.children.length, ...elements);
+  }
+}
+
+class TestFile {
+  readonly name: string;
+  readonly type: string;
+  readonly size: number;
+  readonly dataUrl: string;
+
+  constructor({
+    name,
+    type,
+    size = 12,
+    dataUrl = `data:${type};base64,image-data`,
+  }: {
+    name: string;
+    type: string;
+    size?: number;
+    dataUrl?: string;
+  }) {
+    this.name = name;
+    this.type = type;
+    this.size = size;
+    this.dataUrl = dataUrl;
+  }
+}
+
+class TestFileReader {
+  result: string | null = null;
+  private readonly listeners = new Map<string, Array<() => void>>();
+
+  addEventListener(type: string, listener: () => void) {
+    this.listeners.set(type, [...(this.listeners.get(type) || []), listener]);
+  }
+
+  readAsDataURL(file: TestFile) {
+    this.result = file.dataUrl;
+
+    for (const listener of this.listeners.get("load") || []) {
+      listener();
+    }
   }
 }
 
@@ -76,16 +147,22 @@ function createStorage(initialValues: Record<string, string> = {}) {
 function createPopup({
   authenticated,
   localDraft = "",
+  localImages = [],
 }: {
   authenticated: boolean;
   localDraft?: string;
+  localImages?: Array<Record<string, unknown>>;
 }) {
   const captureArea = new TestElement();
   const appendButton = new TestElement();
+  const imageFileButton = new TestElement();
+  const imageFileInput = new TestElement();
+  const imagePreviewList = new TestElement();
   const openCervoButton = new TestElement();
   const statusMessage = new TestElement();
   const storage = createStorage({
     cervoCaptureDraftText: localDraft,
+    cervoCaptureDraftImages: JSON.stringify(localImages),
   });
   const windowListeners = new Map<string, Listener[]>();
   const open = vi.fn();
@@ -101,6 +178,9 @@ function createPopup({
   const queryTargets = new Map<string, TestElement>([
     ["#capture-text", captureArea],
     ["#append-button", appendButton],
+    ["#image-file-button", imageFileButton],
+    ["#image-file-input", imageFileInput],
+    ["#image-preview-list", imagePreviewList],
     ["#open-cervo-button", openCervoButton],
     ["#capture-status", statusMessage],
   ]);
@@ -111,11 +191,13 @@ function createPopup({
   const context = vm.createContext({
     crypto: { randomUUID: () => "capture-id" },
     document: {
+      createElement: () => new TestElement(),
       querySelector: (selector: string) => queryTargets.get(selector),
     },
     Error,
     Event: TestEvent,
     fetch,
+    FileReader: TestFileReader,
     FormData,
     localStorage: storage,
     window: {
@@ -132,6 +214,9 @@ function createPopup({
     appendButton,
     captureArea,
     fetch,
+    imageFileButton,
+    imageFileInput,
+    imagePreviewList,
     open,
     openCervoButton,
     statusMessage,
@@ -143,6 +228,11 @@ function createPopup({
       await new Promise((resolve) => setTimeout(resolve, 0));
     },
   };
+}
+
+async function waitForDraftWork() {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 describe("extension popup local draft behavior", () => {
@@ -229,5 +319,97 @@ describe("extension popup local draft behavior", () => {
     expect(popup.appendButton.textContent).toBe("Append");
     expect(popup.appendButton.disabled).toBe(false);
     expect(popup.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("adds pasted clipboard images to the local draft", async () => {
+    const image = new TestFile({ name: "clipboard.png", type: "image/png" });
+    const popup = createPopup({ authenticated: false });
+
+    await popup.load();
+    const paste = new TestEvent("paste");
+    paste.clipboardData = {
+      getData: () => undefined,
+      items: [{ kind: "file", getAsFile: () => image }],
+    };
+
+    await popup.captureArea.dispatchEvent("paste", paste);
+    await waitForDraftWork();
+
+    expect(paste.defaultPrevented).toBe(true);
+    expect(JSON.parse(popup.storage.values.get("cervoCaptureDraftImages") || "[]")).toEqual([
+      {
+        dataUrl: "data:image/png;base64,image-data",
+        id: "capture-id",
+        name: "clipboard.png",
+        size: 12,
+        type: "image/png",
+      },
+    ]);
+    expect(popup.imagePreviewList.children).toHaveLength(1);
+    expect(popup.appendButton.disabled).toBe(false);
+  });
+
+  it("imports multiple local image files at once", async () => {
+    const popup = createPopup({ authenticated: true });
+
+    await popup.load();
+    popup.imageFileInput.files = [
+      new TestFile({ name: "first.jpg", type: "image/jpeg" }),
+      new TestFile({ name: "second.webp", type: "image/webp" }),
+    ];
+
+    await popup.imageFileInput.dispatchEvent("change");
+    await waitForDraftWork();
+
+    const storedImages = JSON.parse(popup.storage.values.get("cervoCaptureDraftImages") || "[]");
+    expect(storedImages).toMatchObject([
+      { name: "first.jpg", type: "image/jpeg" },
+      { name: "second.webp", type: "image/webp" },
+    ]);
+    expect(popup.imagePreviewList.children).toHaveLength(2);
+    expect(popup.imageFileInput.value).toBe("");
+  });
+
+  it("restores image drafts and removes thumbnails from local storage immediately", async () => {
+    const popup = createPopup({
+      authenticated: true,
+      localImages: [
+        {
+          dataUrl: "data:image/gif;base64,image-data",
+          id: "stored-image",
+          name: "stored.gif",
+          size: 20,
+          type: "image/gif",
+        },
+      ],
+    });
+
+    await popup.load();
+    expect(popup.imagePreviewList.children).toHaveLength(1);
+    expect(popup.appendButton.disabled).toBe(false);
+
+    const removeButton = popup.imagePreviewList.children[0]?.children[1];
+    await removeButton?.dispatchEvent("click");
+
+    expect(JSON.parse(popup.storage.values.get("cervoCaptureDraftImages") || "[]")).toEqual([]);
+    expect(popup.imagePreviewList.children).toHaveLength(0);
+    expect(popup.appendButton.disabled).toBe(true);
+  });
+
+  it("rejects unsupported and oversized local images", async () => {
+    const popup = createPopup({ authenticated: false });
+
+    await popup.load();
+    popup.imageFileInput.files = [
+      new TestFile({ name: "notes.txt", type: "text/plain" }),
+      new TestFile({ name: "huge.png", type: "image/png", size: 6 * 1024 * 1024 }),
+    ];
+
+    await popup.imageFileInput.dispatchEvent("change");
+    await waitForDraftWork();
+
+    expect(JSON.parse(popup.storage.values.get("cervoCaptureDraftImages") || "[]")).toEqual([]);
+    expect(popup.imagePreviewList.children).toHaveLength(0);
+    expect(popup.statusMessage.textContent).toBe("That image is too large for a local draft.");
   });
 });
