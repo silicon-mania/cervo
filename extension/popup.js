@@ -116,6 +116,24 @@ function validateImage(file) {
   return "";
 }
 
+function dataUrlToBlob(dataUrl, fallbackType) {
+  const [metadata, data] = dataUrl.split(",");
+  const mimeType = metadata?.match(/^data:([^;]+);base64$/)?.[1] || fallbackType;
+
+  if (!data) {
+    throw new Error("Unable to append image.");
+  }
+
+  const binary = atob(data);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return new Blob([bytes], { type: mimeType });
+}
+
 async function addImageFiles(files) {
   const acceptedFiles = [];
 
@@ -223,21 +241,22 @@ async function appendCapture() {
     return;
   }
 
-  if (hasImageDraft()) {
-    setStatus("Images stay local until image append support is ready.");
-    captureArea.focus();
-    return;
-  }
-
-  const snapshot = captureArea.value.trimEnd();
+  const textSnapshot = captureArea.value.trimEnd();
+  const imageSnapshot = [...imageDrafts];
   const formData = new FormData();
 
   formData.set("captureId", crypto.randomUUID());
-  formData.set("text", snapshot);
+  formData.set("text", textSnapshot);
+
+  for (const image of imageSnapshot) {
+    formData.append("images", dataUrlToBlob(image.dataUrl, image.type), image.name);
+  }
 
   isAppending = true;
   captureArea.value = "";
+  imageDrafts = [];
   saveLocalDraft();
+  renderImageDrafts();
   syncActionState();
   setStatus("Appending...");
 
@@ -254,8 +273,10 @@ async function appendCapture() {
 
     setStatus("Appended.");
   } catch (error) {
-    captureArea.value = snapshot;
+    captureArea.value = textSnapshot;
+    imageDrafts = imageSnapshot;
     saveLocalDraft();
+    renderImageDrafts();
     setStatus(error instanceof Error ? error.message : "Unable to append.");
   } finally {
     isAppending = false;

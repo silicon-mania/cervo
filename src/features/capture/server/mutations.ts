@@ -3,8 +3,13 @@ import type { JSONContent } from "@tiptap/react";
 
 import { getAppTimeZone, getDailyNoteTitle, getDateKeyInTimeZone } from "@/features/daily-notes/server/date";
 import { getDb } from "@/server/db/client";
-import { documents } from "@/server/db/schema";
+import { attachments, documents } from "@/server/db/schema";
 
+import {
+  type CaptureImageFile,
+  storeCaptureImages,
+  validateCaptureImageFile,
+} from "./image-attachments";
 import {
   appendPlainTextToDocument,
   emptyCaptureDocumentContent,
@@ -14,7 +19,11 @@ import {
 export type CaptureAppendResult = {
   ok: true;
   dailyNoteId: string;
+  attachmentIds: string[];
+  attachmentCount: number;
 };
+
+export type { CaptureImageFile };
 
 type DailyNoteForAppend = {
   id: string;
@@ -32,25 +41,13 @@ function selectAppendDailyNoteFields() {
   };
 }
 
-export async function appendCaptureTextToCurrentDailyNote({
+async function getCurrentDailyNoteForAppend({
   workspaceId,
   clerkUserId,
-  captureId,
-  text,
 }: {
   workspaceId: string;
   clerkUserId: string;
-  captureId: string;
-  text: string;
-}): Promise<CaptureAppendResult> {
-  void captureId;
-
-  const normalizedText = normalizeCaptureText(text);
-
-  if (!normalizedText) {
-    throw new Error("Capture text is required.");
-  }
-
+}) {
   const db = getDb();
   const now = new Date();
   const timeZone = getAppTimeZone();
@@ -77,32 +74,8 @@ export async function appendCaptureTextToCurrentDailyNote({
       }
     : null;
 
-  const nextContent = appendPlainTextToDocument({
-    existingContentJson: existingDailyNote?.contentJson ?? emptyCaptureDocumentContent,
-    existingContentText: existingDailyNote?.contentText ?? "",
-    text: normalizedText,
-  });
-
   if (existingDailyNote) {
-    const [updatedDocument] = await db
-      .update(documents)
-      .set({
-        contentJson: nextContent.contentJson,
-        contentText: nextContent.contentText,
-        updatedBy: clerkUserId,
-        updatedAt: now,
-      })
-      .where(and(eq(documents.id, existingDailyNote.id), eq(documents.workspaceId, workspaceId)))
-      .returning({ id: documents.id });
-
-    if (!updatedDocument) {
-      throw new Error("Unable to append capture.");
-    }
-
-    return {
-      ok: true,
-      dailyNoteId: updatedDocument.id,
-    };
+    return { dailyNote: existingDailyNote, created: false };
   }
 
   const [createdDocument] = await db
@@ -112,21 +85,138 @@ export async function appendCaptureTextToCurrentDailyNote({
       type: "daily_note",
       date: todayDate,
       title: getDailyNoteTitle(todayDate),
-      contentJson: nextContent.contentJson,
-      contentText: nextContent.contentText,
+      contentJson: emptyCaptureDocumentContent,
+      contentText: "",
       createdBy: clerkUserId,
       updatedBy: clerkUserId,
       createdAt: now,
       updatedAt: now,
     })
-    .returning({ id: documents.id });
+    .returning(selectAppendDailyNoteFields());
 
   if (!createdDocument) {
     throw new Error("Unable to create daily note.");
   }
 
   return {
+    dailyNote: {
+      id: createdDocument.id,
+      title: createdDocument.title,
+      contentJson: createdDocument.contentJson as JSONContent,
+      contentText: createdDocument.contentText,
+    },
+    created: true,
+  };
+}
+
+async function appendTextToDailyNote({
+  dailyNote,
+  workspaceId,
+  clerkUserId,
+  text,
+}: {
+  dailyNote: DailyNoteForAppend;
+  workspaceId: string;
+  clerkUserId: string;
+  text: string;
+}) {
+  const db = getDb();
+  const now = new Date();
+  const nextContent = appendPlainTextToDocument({
+    existingContentJson: dailyNote.contentJson,
+    existingContentText: dailyNote.contentText,
+    text,
+  });
+
+  const [updatedDocument] = await db
+    .update(documents)
+    .set({
+      contentJson: nextContent.contentJson,
+      contentText: nextContent.contentText,
+      updatedBy: clerkUserId,
+      updatedAt: now,
+    })
+    .where(and(eq(documents.id, dailyNote.id), eq(documents.workspaceId, workspaceId)))
+    .returning({ id: documents.id });
+
+  if (!updatedDocument) {
+    throw new Error("Unable to append capture.");
+  }
+
+  return updatedDocument.id;
+}
+
+export async function appendCaptureToCurrentDailyNote({
+  workspaceId,
+  clerkUserId,
+  captureId,
+  text,
+  images = [],
+}: {
+  workspaceId: string;
+  clerkUserId: string;
+  captureId: string;
+  text: string;
+  images?: CaptureImageFile[];
+}): Promise<CaptureAppendResult> {
+  const normalizedText = normalizeCaptureText(text);
+
+  if (!normalizedText && images.length === 0) {
+    throw new Error("Capture text or image is required.");
+  }
+
+  images.forEach(validateCaptureImageFile);
+
+  const { dailyNote } = await getCurrentDailyNoteForAppend({
+    workspaceId,
+    clerkUserId,
+  });
+
+  if (normalizedText) {
+    await appendTextToDailyNote({
+      dailyNote,
+      workspaceId,
+      clerkUserId,
+      text: normalizedText,
+    });
+  } else {
+    await getDb()
+      .update(documents)
+      .set({ updatedBy: clerkUserId, updatedAt: new Date() })
+      .where(and(eq(documents.id, dailyNote.id), eq(documents.workspaceId, workspaceId)));
+  }
+
+  const storedImages = await storeCaptureImages({
+    workspaceId,
+    documentId: dailyNote.id,
+    captureId,
+    images,
+  });
+
+  const insertedAttachments =
+    storedImages.length > 0
+      ? await getDb()
+          .insert(attachments)
+          .values(
+            storedImages.map((image) => ({
+              workspaceId,
+              sourceType: "document" as const,
+              sourceId: dailyNote.id,
+              storagePath: image.storagePath,
+              fileName: image.fileName,
+              mimeType: image.mimeType,
+              size: image.size,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            })),
+          )
+          .returning({ id: attachments.id })
+      : [];
+
+  return {
     ok: true,
-    dailyNoteId: createdDocument.id,
+    dailyNoteId: dailyNote.id,
+    attachmentIds: insertedAttachments.map((attachment) => attachment.id),
+    attachmentCount: insertedAttachments.length,
   };
 }

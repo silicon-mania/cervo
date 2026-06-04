@@ -190,6 +190,8 @@ function createPopup({
   );
   const context = vm.createContext({
     crypto: { randomUUID: () => "capture-id" },
+    atob,
+    Blob,
     document: {
       createElement: () => new TestElement(),
       querySelector: (selector: string) => queryTargets.get(selector),
@@ -200,6 +202,7 @@ function createPopup({
     FileReader: TestFileReader,
     FormData,
     localStorage: storage,
+    Uint8Array,
     window: {
       addEventListener: (type: string, listener: Listener) => {
         windowListeners.set(type, [...(windowListeners.get(type) || []), listener]);
@@ -368,6 +371,42 @@ describe("extension popup local draft behavior", () => {
     ]);
     expect(popup.imagePreviewList.children).toHaveLength(2);
     expect(popup.imageFileInput.value).toBe("");
+  });
+
+  it("sends image drafts as multipart append files and clears them on success", async () => {
+    const popup = createPopup({
+      authenticated: true,
+      localDraft: "Caption",
+      localImages: [
+        {
+          dataUrl: "data:image/png;base64,aW1hZ2UtZGF0YQ==",
+          id: "stored-image",
+          name: "stored.png",
+          size: 10,
+          type: "image/png",
+        },
+      ],
+    });
+
+    await popup.load();
+    await popup.appendButton.dispatchEvent("click");
+    await waitForDraftWork();
+
+    const appendCall = popup.fetch.mock.calls[1] as [string, RequestInit?] | undefined;
+    const appendInit = appendCall?.[1] as RequestInit | undefined;
+    const body = appendInit?.body as FormData;
+
+    expect(appendCall?.[0]).toBe("http://localhost:3000/api/capture/append");
+    expect(body.get("captureId")).toBe("capture-id");
+    expect(body.get("text")).toBe("Caption");
+    expect(body.getAll("images")).toHaveLength(1);
+    expect((body.getAll("images")[0] as File).name).toBe("stored.png");
+    expect((body.getAll("images")[0] as File).type).toBe("image/png");
+    expect(popup.captureArea.value).toBe("");
+    expect(popup.imagePreviewList.children).toHaveLength(0);
+    expect(popup.storage.values.get("cervoCaptureDraftText")).toBe("");
+    expect(JSON.parse(popup.storage.values.get("cervoCaptureDraftImages") || "[]")).toEqual([]);
+    expect(popup.statusMessage.textContent).toBe("Appended.");
   });
 
   it("restores image drafts and removes thumbnails from local storage immediately", async () => {
