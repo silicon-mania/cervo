@@ -1,7 +1,9 @@
 const DEFAULT_CERVO_BASE_URL = "http://localhost:3000";
+const LOCAL_DRAFT_TEXT_KEY = "cervoCaptureDraftText";
 
 const captureArea = document.querySelector("#capture-text");
 const appendButton = document.querySelector("#append-button");
+const openCervoButton = document.querySelector("#open-cervo-button");
 const statusMessage = document.querySelector("#capture-status");
 
 let isAppending = false;
@@ -17,12 +19,29 @@ function setStatus(message) {
   statusMessage.textContent = message;
 }
 
+function getSignInUrl() {
+  return `${getCervoBaseUrl()}/sign-in`;
+}
+
+function getAppUrl() {
+  return `${getCervoBaseUrl()}/`;
+}
+
 function hasTextDraft() {
   return captureArea.value.trimEnd().length > 0;
 }
 
-function syncAppendState() {
-  appendButton.disabled = isAppending || !hasTextDraft();
+function saveLocalDraft() {
+  localStorage.setItem(LOCAL_DRAFT_TEXT_KEY, captureArea.value);
+}
+
+function restoreLocalDraft() {
+  captureArea.value = localStorage.getItem(LOCAL_DRAFT_TEXT_KEY) || "";
+}
+
+function syncActionState() {
+  appendButton.textContent = isAuthenticated ? "Append" : "Sign in";
+  appendButton.disabled = isAppending || (isAuthenticated && !hasTextDraft());
 }
 
 function insertPlainText(text) {
@@ -41,15 +60,17 @@ async function refreshSession() {
     const payload = await response.json();
 
     isAuthenticated = Boolean(payload.authenticated);
-    setStatus(isAuthenticated ? "" : "Sign in to Cervo before appending.");
+    setStatus(isAuthenticated ? "" : "Stored locally until Cervo is connected.");
   } catch {
     isAuthenticated = false;
-    setStatus("Connect to Cervo before appending.");
+    setStatus("Stored locally until Cervo is connected.");
+  } finally {
+    syncActionState();
   }
 }
 
 async function appendCapture() {
-  if (isAppending || !hasTextDraft()) {
+  if (isAppending) {
     return;
   }
 
@@ -58,8 +79,12 @@ async function appendCapture() {
   }
 
   if (!isAuthenticated) {
-    setStatus("Sign in to Cervo before appending.");
+    setStatus("Stored locally until Cervo is connected.");
     captureArea.focus();
+    return;
+  }
+
+  if (!hasTextDraft()) {
     return;
   }
 
@@ -71,7 +96,8 @@ async function appendCapture() {
 
   isAppending = true;
   captureArea.value = "";
-  syncAppendState();
+  saveLocalDraft();
+  syncActionState();
   setStatus("Appending...");
 
   try {
@@ -88,17 +114,23 @@ async function appendCapture() {
     setStatus("Appended.");
   } catch (error) {
     captureArea.value = snapshot;
+    saveLocalDraft();
     setStatus(error instanceof Error ? error.message : "Unable to append.");
   } finally {
     isAppending = false;
-    syncAppendState();
+    syncActionState();
     captureArea.focus();
   }
 }
 
+function openCervo() {
+  window.open(isAuthenticated ? getAppUrl() : getSignInUrl(), "_blank", "noopener");
+}
+
 captureArea.addEventListener("input", () => {
-  syncAppendState();
-  setStatus("");
+  saveLocalDraft();
+  syncActionState();
+  setStatus(isAuthenticated ? "" : "Stored locally until Cervo is connected.");
 });
 
 captureArea.addEventListener("paste", (event) => {
@@ -116,15 +148,30 @@ captureArea.addEventListener("keydown", (event) => {
   }
 
   event.preventDefault();
+  if (!isAuthenticated) {
+    setStatus("Stored locally until Cervo is connected.");
+    captureArea.focus();
+    return;
+  }
+
   void appendCapture();
 });
 
 appendButton.addEventListener("click", () => {
-  void appendCapture();
+  if (isAuthenticated) {
+    void appendCapture();
+    return;
+  }
+
+  window.open(getSignInUrl(), "_blank", "noopener");
+  captureArea.focus();
 });
 
+openCervoButton.addEventListener("click", openCervo);
+
 window.addEventListener("DOMContentLoaded", () => {
+  restoreLocalDraft();
   captureArea.focus();
-  syncAppendState();
+  syncActionState();
   void refreshSession();
 });

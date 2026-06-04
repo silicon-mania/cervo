@@ -76,17 +76,27 @@ body {
   white-space: nowrap;
 }
 
-.append-button {
+.capture-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.append-button,
+.secondary-button {
   height: 32px;
-  border: 0;
   border-radius: 8px;
-  background: var(--primary);
-  color: var(--primary-foreground);
   cursor: pointer;
   font: inherit;
   font-size: 13px;
   font-weight: 600;
   padding: 0 12px;
+}
+
+.append-button {
+  border: 0;
+  background: var(--primary);
+  color: var(--primary-foreground);
 }
 
 .append-button:hover:not(:disabled) {
@@ -96,4 +106,14 @@ body {
 .append-button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.secondary-button {
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.secondary-button:hover {
+  background: var(--surface);
 }
