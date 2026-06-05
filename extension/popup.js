@@ -19,7 +19,7 @@ let appendChain = Promise.resolve();
 let recoverableAppend = null;
 
 function getCervoBaseUrl() {
-  const configuredUrl = localStorage.getItem("cervoBaseUrl");
+  const configuredUrl = window.CERVO_CAPTURE_CONFIG?.baseUrl;
 
   return (configuredUrl || DEFAULT_CERVO_BASE_URL).replace(/\/$/, "");
 }

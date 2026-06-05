@@ -25,3 +25,24 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+## Browser Extension
+
+The Chrome-compatible capture extension lives in [extension](extension) as a
+standalone load-unpacked target, separate from the Next.js route tree.
+
+For local verification, run the app at `http://localhost:3000`, then load the
+`extension/` folder from `chrome://extensions` with developer mode enabled. The
+checked-in `extension/config.js` points the popup at localhost, and the manifest
+only grants host access to that local Cervo origin.
+
+For a deployable extension bundle, set the target Cervo origin at build time:
+
+```bash
+CERVO_EXTENSION_BASE_URL=https://cervo.app npm run build:extension
+```
+
+Load or package `dist/extension/`. The build rewrites `config.js` and the
+manifest host permission to match `CERVO_EXTENSION_BASE_URL`. The extension does
+not request tabs, activeTab, context menus, clipboard-read, side panel, or
+options/settings permissions.

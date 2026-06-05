@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:extension": "node scripts/build-extension.mjs",
     "start": "next start",
     "test": "vitest run",
     "lint": "eslint",
@@ -57,6 +58,6 @@
     "vitest": "^4.1.8"
   },
   "knip": {
-    "ignore": ["extension/popup.css", "extension/popup.js"]
+    "ignore": ["extension/config.js", "extension/popup.css", "extension/popup.js"]
   }
 }
