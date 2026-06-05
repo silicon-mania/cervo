@@ -1,6 +1,6 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -30,8 +30,7 @@ export default function PrivacyPolicyPage() {
         <div className="flex items-center justify-between gap-4">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
-          >
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted">
             <ArrowLeft className="size-4" aria-hidden="true" />
             Back to app
           </Link>
@@ -97,8 +96,8 @@ export default function PrivacyPolicyPage() {
                 administrator with the ability to manage that content.
               </p>
               <p>
-                Authentication records, logs, and operational data are retained as needed to run
-                the service and maintain security.
+                Authentication records, logs, and operational data are retained as needed to run the
+                service and maintain security.
               </p>
             </Section>
 
@@ -106,7 +105,9 @@ export default function PrivacyPolicyPage() {
               <ul className="list-disc space-y-2 pl-5">
                 <li>You can edit or delete notes, boxes, tasks, and attachments in the app.</li>
                 <li>Workspace owners and admins can manage membership and access.</li>
-                <li>You can stop using the extension at any time by removing it from your browser.</li>
+                <li>
+                  You can stop using the extension at any time by removing it from your browser.
+                </li>
               </ul>
             </Section>
 
@@ -120,8 +121,8 @@ export default function PrivacyPolicyPage() {
 
             <Section title="Contact">
               <p>
-                If you have privacy questions, contact the team that provided your Cervo
-                deployment or the workspace owner who manages your account.
+                If you have privacy questions, contact the team that provided your Cervo deployment
+                or the workspace owner who manages your account.
               </p>
             </Section>
           </div>
