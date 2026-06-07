@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { useAppShellHeaderCreateNoteAction } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -422,6 +423,7 @@ export function BoxesExplorer({
   onCreateDocument,
 }: BoxesExplorerProps) {
   const queryClient = useQueryClient();
+  const setHeaderCreateNoteAction = useAppShellHeaderCreateNoteAction();
   const [activeTarget, setActiveTarget] = useState<ActiveTarget>({
     type: "root",
   });
@@ -613,6 +615,7 @@ export function BoxesExplorer({
       toast.error("Note could not be created. Try again in a moment.");
     },
   });
+  const { mutate: createNoteMutate } = createNoteMutation;
 
   const updateBoxMutation = useMutation<BoxSummary, Error, UpdateBoxRequest, UpdateBoxContext>({
     mutationFn: updateBoxRequest,
@@ -837,16 +840,27 @@ export function BoxesExplorer({
     setActiveTarget({ type: "box", boxId: activeBox.parentBoxId });
   };
 
-  const createNote = () => {
+  const createNote = useCallback(() => {
     if (activeTarget.type === "box" && isOptimisticBoxTarget) {
       return;
     }
 
-    createNoteMutation.mutate({
+    createNoteMutate({
       id: crypto.randomUUID(),
       boxId: activeTarget.type === "box" ? activeTarget.boxId : null,
     });
-  };
+  }, [activeTarget, createNoteMutate, isOptimisticBoxTarget]);
+
+  useEffect(() => {
+    setHeaderCreateNoteAction({
+      onCreate: createNote,
+      disabled: activeTarget.type === "box" && isOptimisticBoxTarget,
+    });
+
+    return () => {
+      setHeaderCreateNoteAction(null);
+    };
+  }, [activeTarget.type, createNote, isOptimisticBoxTarget, setHeaderCreateNoteAction]);
 
   const hasContent =
     activeTarget.type === "root" || visibleBoxes.length > 0 || visibleDocuments.length > 0;

@@ -53,16 +53,17 @@ function AutosaveStatus({
     );
   }
 
-  return (
-    <div
-      className={cn(
-        "inline-flex items-center gap-2 text-sm text-muted-foreground",
-        "transition-opacity",
-      )}>
-      <Check className="h-3.5 w-3.5 opacity-50" />
-      <span className="opacity-70">Saved</span>
-    </div>
-  );
+  // return (
+  //   <div
+  //     className={cn(
+  //       "inline-flex items-center gap-2 text-sm text-muted-foreground",
+  //       "transition-opacity",
+  //     )}>
+  //     <Check className="h-3.5 w-3.5 opacity-50" />
+  //     <span className="opacity-70">Saved</span>
+  //   </div>
+  // );
+  return null;
 }
 
 export function DocumentAutosaveEditor({
